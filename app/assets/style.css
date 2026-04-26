@@ -1,0 +1,93 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  background: linear-gradient(180deg, #f4f7fb 0%, #e8eef7 100%);
+  font-family: "Segoe UI", Arial, sans-serif;
+  color: #0f172a;
+}
+
+.dashboard-page {
+  min-height: 100vh;
+  padding: 32px 20px 48px;
+}
+
+.dashboard-shell {
+  max-width: 1280px;
+  margin: 0 auto;
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 24px 24px 18px;
+  box-shadow: 0 14px 40px rgba(17, 38, 72, 0.10);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.dashboard-title {
+  text-align: center;
+  margin: 0 0 24px;
+  font-size: 2.2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #0f172a;
+}
+
+.dashboard-card {
+  margin-bottom: 20px;
+}
+
+.timeline-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.timeline-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.timeline-button {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+.timeline-button:hover {
+  background: #eef4ff;
+  border-color: #a5b4fc;
+}
+
+.date-indicator {
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: #eef4ff;
+  color: #1e3a8a;
+  font-weight: 700;
+  border: 1px solid #dbe7ff;
+  white-space: nowrap;
+}
+
+.dashboard-graph {
+  height: 760px;
+}
+
+.dashboard-graph .js-plotly-plot,
+.dashboard-graph .plot-container {
+  height: 100% !important;
+}
+
+.dashboard-graph .main-svg {
+  overflow: visible;
+}
