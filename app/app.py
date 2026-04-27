@@ -9,6 +9,7 @@ try:
         prepare_map_data,
         generate_date_slider_marks,
         generate_map_figure,
+        generate_gdp_alluvial_figure,
     )
 except ImportError:
     from data_manipulation import (
@@ -18,6 +19,7 @@ except ImportError:
         prepare_map_data,
         generate_date_slider_marks,
         generate_map_figure,
+        generate_gdp_alluvial_figure,
     )
 
 app = dash.Dash(__name__)
@@ -25,6 +27,9 @@ app = dash.Dash(__name__)
 
 #* GERAÇÃO DO MAPA
 df_health = load_health_covid_data(FILEPATH)
+if df_health is None:
+    raise FileNotFoundError(f'Não foi possível carregar os dados de {FILEPATH}')
+
 date_marks = generate_date_slider_marks(df_health)
 df_map_base = build_map_base_data(df_health)
 min_date = df_health['date'].min()
@@ -83,7 +88,7 @@ def update_map(end_date_value, metric_value):
 def control_timeline(toggle_clicks, speed_clicks, interval_ticks, is_playing, slider_value, speed_index):
     triggered_id = ctx.triggered_id
     is_playing = bool(is_playing)
-    current_value = pd.to_datetime(DEFAULT_DATE_MS, unit='ms').strftime('%d/%m/%Y') if slider_value is None else int(slider_value)
+    current_value = DEFAULT_DATE_MS if slider_value is None else int(slider_value)
 
     try:
         speed_index = int(speed_index)
@@ -179,7 +184,20 @@ app.layout = html.Div(
                 color_max=max_total_deaths,
             ),
             className='dashboard-graph',
+            style={'width': '100%', 'height': '760px'},
             config={'displayModeBar': False, 'responsive': True},
+        ),
+        html.Div(
+            children=[
+                html.Div('Evolução do PIB por país', className='gdp-alluvial-title'),
+                dcc.Graph(
+                    id='gdp-alluvial-graph',
+                    figure=generate_gdp_alluvial_figure(allowed_country_names=df_map_base['location'].unique()),
+                    className='gdp-alluvial-graph',
+                    config={'displayModeBar': False, 'responsive': True},
+                ),
+            ],
+            className='gdp-alluvial-panel',
         ),
     ],
     className='dashboard-shell',

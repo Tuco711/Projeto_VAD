@@ -81,6 +81,9 @@ body {
 
 .dashboard-graph {
   height: 760px;
+  display: block;
+  width: 100%;
+  margin-bottom: 8px;
 }
 
 .dashboard-graph .js-plotly-plot,
@@ -90,4 +93,31 @@ body {
 
 .dashboard-graph .main-svg {
   overflow: visible;
+}
+
+.gdp-alluvial-panel {
+  width: 20%;
+  min-width: 300px;
+  margin-top: 12px;
+}
+
+.gdp-alluvial-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 2px 0;
+}
+
+.gdp-alluvial-graph {
+  height: 300px;
+  min-height: 300px;
+  margin: 0;
+  display: block;
+  width: 100%;
+  overflow-y: auto;
+}
+
+.gdp-alluvial-graph .js-plotly-plot,
+.gdp-alluvial-graph .plot-container {
+  width: 100% !important;
 }

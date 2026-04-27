@@ -3,13 +3,177 @@ import plotly.io as pio
 import numpy as np
 from pathlib import Path
 import plotly.express as px
+import plotly.graph_objects as go
 
 # Global settings
 pio.templates.default = "plotly_white"
 
 FILEPATH = Path('.\\datasets\\owid-covid-data.csv')
+GDP_FILEPATH = Path('.\\datasets\\GDP_data.csv')
 
-def load_full_covid_data(filepath: Path) -> pd.DataFrame:
+
+def _extract_gdp_year_columns(df_gdp: pd.DataFrame) -> dict:
+    year_columns = {}
+    for column in df_gdp.columns:
+        if len(column) >= 4 and column[:4].isdigit():
+            year_columns[int(column[:4])] = column
+    return dict(sorted(year_columns.items()))
+
+
+def generate_gdp_alluvial_figure(filepath: Path = GDP_FILEPATH, top_n: int = 12, allowed_country_names=None):
+    df_gdp = pd.read_csv(filepath)
+    year_columns = _extract_gdp_year_columns(df_gdp)
+
+    selected_years = [2019, 2022, 2024]
+    missing_years = [year for year in selected_years if year not in year_columns]
+    if missing_years:
+        raise ValueError(
+            'GDP_data.csv precisa conter as colunas de 2019, 2022 e 2024 para o diagrama alluvial.'
+        )
+
+    selected_columns = [
+        'Country Name',
+        'Country Code',
+        *(year_columns[year] for year in selected_years),
+    ]
+    df_selected = df_gdp[selected_columns].copy()
+
+    df_long = df_selected.melt(
+        id_vars=['Country Name', 'Country Code'],
+        var_name='year_column',
+        value_name='gdp_usd',
+    )
+
+    column_to_year = {year_columns[year]: year for year in selected_years}
+    df_long['year'] = df_long['year_column'].map(column_to_year)
+    df_long['gdp_usd'] = pd.to_numeric(df_long['gdp_usd'], errors='coerce')
+    df_long = df_long.dropna(subset=['gdp_usd'])
+    df_long = df_long[df_long['gdp_usd'] > 0].copy()
+
+    if allowed_country_names is not None:
+        allowed_country_names = {str(name) for name in allowed_country_names if pd.notna(name)}
+        df_long = df_long[df_long['Country Name'].isin(allowed_country_names)].copy()
+
+    first_year = selected_years[0]
+    middle_year = selected_years[1]
+    latest_year = selected_years[-1]
+    top_countries = (
+        df_long[df_long['year'] == latest_year]
+        .sort_values('gdp_usd', ascending=False)
+        .head(top_n)['Country Code']
+        .tolist()
+    )
+
+    df_long = df_long[df_long['Country Code'].isin(top_countries)].copy()
+
+    country_order = df_long[df_long['year'] == latest_year].sort_values('gdp_usd', ascending=False)['Country Name'].tolist()
+
+    node_keys = []
+    node_labels = []
+    node_colors = []
+    node_x = []
+    node_y = []
+    palette = px.colors.sample_colorscale('Blues', [0.35 + 0.45 * i / max(len(country_order) - 1, 1) for i in range(len(country_order))])
+    color_by_country = {country: palette[index] for index, country in enumerate(country_order)}
+
+    year_positions = {
+        first_year: 0.01,
+        middle_year: 0.50,
+        latest_year: 0.99,
+    }
+    y_positions = [0.02 + (0.96 * i / max(len(country_order) - 1, 1)) for i in range(len(country_order))]
+
+    for year in selected_years:
+        for index, country in enumerate(country_order):
+            node_keys.append((year, country))
+            node_labels.append(country if year == latest_year else '')
+            node_colors.append(color_by_country[country])
+            node_x.append(year_positions[year])
+            node_y.append(y_positions[index])
+
+    node_index = {key: index for index, key in enumerate(node_keys)}
+
+    values_by_year = (
+        df_long.pivot_table(
+            index=['Country Code', 'Country Name'],
+            columns='year',
+            values='gdp_usd',
+            aggfunc='first',
+        )
+        .reset_index()
+    )
+
+    values_by_year = values_by_year[values_by_year['Country Code'].isin(top_countries)].copy()
+
+    sources = []
+    targets = []
+    values = []
+    custom_text = []
+
+    year_pairs = list(zip(selected_years[:-1], selected_years[1:]))
+    for start_year, end_year in year_pairs:
+        start_values = values_by_year[['Country Code', 'Country Name', start_year, end_year]].copy()
+        for _, row in start_values.iterrows():
+            country_name = row['Country Name']
+            start_gdp = row[start_year]
+            end_gdp = row[end_year]
+            if pd.isna(start_gdp) or pd.isna(end_gdp):
+                continue
+
+            sources.append(node_index[(start_year, country_name)])
+            targets.append(node_index[(end_year, country_name)])
+            values.append(float(start_gdp))
+            custom_text.append(f'{country_name}: {start_year} = {start_gdp:,.0f} USD, {end_year} = {end_gdp:,.0f} USD')
+
+    fig = go.Figure(
+        data=[
+            go.Sankey(
+                arrangement='snap',
+                node=dict(
+                    pad=10,
+                    thickness=12,
+                    line=dict(color='rgba(30, 41, 59, 0.25)', width=0.6),
+                    label=node_labels,
+                    color=node_colors,
+                    x=node_x,
+                    y=node_y,
+                    align='left',
+                ),
+                link=dict(
+                    source=sources,
+                    target=targets,
+                    value=values,
+                    color='rgba(37, 99, 235, 0.22)',
+                    customdata=custom_text,
+                    hovertemplate='%{customdata}<extra></extra>',
+                ),
+                valueformat=',d',
+            )
+        ]
+    )
+
+    layout_height = 700
+    margin_top = 72
+    margin_bottom = 8
+    year_label_y = 1.02
+
+    fig.update_layout(
+        title=None,
+        template='plotly_white',
+        height=layout_height,
+        margin=dict(t=margin_top, l=8, r=8, b=margin_bottom),
+        paper_bgcolor='rgba(0,0,0,0)',
+        font=dict(size=10),
+        annotations=[
+            dict(x=year_positions[first_year], y=year_label_y, xref='paper', yref='paper', text=str(first_year), showarrow=False, font=dict(size=14, color='#0f172a')),
+            dict(x=year_positions[middle_year], y=year_label_y, xref='paper', yref='paper', text=str(middle_year), showarrow=False, font=dict(size=14, color='#0f172a')),
+            dict(x=year_positions[latest_year], y=year_label_y, xref='paper', yref='paper', text=str(latest_year), showarrow=False, font=dict(size=14, color='#0f172a')),
+        ],
+    )
+
+    return fig
+
+def load_full_covid_data(filepath: Path) -> pd.DataFrame | None:
     try:
         df = pd.read_csv(filepath)
 
@@ -33,7 +197,7 @@ def load_full_covid_data(filepath: Path) -> pd.DataFrame:
         print(f"Arquivo não encontrado: {filepath}")
         return None
 
-def load_health_covid_data(filepath: Path) -> pd.DataFrame:
+def load_health_covid_data(filepath: Path) -> pd.DataFrame | None:
     df = load_full_covid_data(filepath)
     if df is not None:
         df_health = df[
