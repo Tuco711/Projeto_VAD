@@ -161,8 +161,13 @@ app.layout = html.Div(
                     step=DAY_IN_MS,
                     marks=date_marks,
                     updatemode='mouseup',
-                    # 1. Isso desativa a caixinha (tooltip) com o número gigante ao arrastar
-                    tooltip={"always_visible": False, "placement": "bottom"}, 
+                    tooltip={
+                        "always_visible": False,
+                        "placement": "bottom",
+                        "transform": "formatDate",
+                        "template": "{value}",
+                    },
+                    allow_direct_input=False, 
                 ),
                 dcc.Interval(
                     id='timeline-interval',
