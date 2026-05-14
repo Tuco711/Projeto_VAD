@@ -10,6 +10,10 @@ try:
         generate_date_slider_marks,
         generate_map_figure,
         generate_gdp_alluvial_figure,
+        generate_covid_evolution_figure,
+        generate_gdp_trend_figure,
+        generate_gdp_mortality_scatter_figure,
+        generate_age_mortality_figure,
     )
 except ImportError:
     from data_manipulation import (
@@ -20,6 +24,10 @@ except ImportError:
         generate_date_slider_marks,
         generate_map_figure,
         generate_gdp_alluvial_figure,
+        generate_covid_evolution_figure,
+        generate_gdp_trend_figure,
+        generate_gdp_mortality_scatter_figure,
+        generate_age_mortality_figure,
     )
 
 app = dash.Dash(__name__)
@@ -29,14 +37,29 @@ app = dash.Dash(__name__)
 df_health = load_health_covid_data(FILEPATH)
 if df_health is None:
     raise FileNotFoundError(f'Não foi possível carregar os dados de {FILEPATH}')
+assert df_health is not None
+df_health_data: pd.DataFrame = df_health
 
-date_marks = generate_date_slider_marks(df_health)
+date_marks = generate_date_slider_marks(df_health, num_marks=3)
 df_map_base = build_map_base_data(df_health)
 min_date = df_health['date'].min()
 max_date = df_health['date'].max()
 default_date = max_date
 max_total_deaths = df_health['total_deaths'].max()
 max_cfr_pct = df_map_base['cfr_pct'].max()
+country_values = sorted(df_map_base['location'].dropna().unique().tolist())
+country_options = [
+    {'label': location, 'value': location}
+    for location in country_values
+]
+default_countries = (
+    prepare_map_data(df_map_base, preprocessed=True)
+    .sort_values('total_deaths', ascending=False)['location']
+    .dropna()
+    .drop_duplicates()
+    .head(6)
+    .tolist()
+)
 
 MIN_DATE_MS = int(min_date.value // 10**6)
 MAX_DATE_MS = int(max_date.value // 10**6)
@@ -48,82 +71,220 @@ SPEED_STEPS = [
     ('4x', 375),
 ]
 
+
+def _normalize_selected_countries(selected_countries):
+    # Coerce single string into a list
+    if isinstance(selected_countries, str):
+        selected_countries = [selected_countries]
+
+    # If it's not an iterable of country names, fall back to defaults
+    if not selected_countries or not hasattr(selected_countries, '__iter__'):
+        return default_countries
+
+    # Normalize items to str and filter by available values
+    normalized = [str(country) for country in selected_countries if pd.notna(country) and str(country) in country_values]
+    return normalized or default_countries
+
+
+def _extract_country_from_click(click_data):
+    if not click_data:
+        return None
+
+    points = click_data.get('points') or []
+    if not points:
+        return None
+
+    point = points[0]
+    for key in ('hovertext', 'text', 'location'):
+        value = point.get(key)
+        if value:
+            return value
+
+    customdata = point.get('customdata')
+    if isinstance(customdata, (list, tuple)):
+        for value in customdata:
+            if isinstance(value, str) and value:
+                return value
+
+    return None
+
+@app.callback(
+    dash.dependencies.Output('country-selection-store', 'data'),
+    [
+        dash.dependencies.Input('country-selector', 'value'),
+        dash.dependencies.Input('map-graph', 'clickData'),
+        dash.dependencies.Input('gdp-alluvial-graph', 'clickData'),
+        dash.dependencies.Input('covid-evolution-graph', 'clickData'),
+        dash.dependencies.Input('gdp-trend-graph', 'clickData'),
+        dash.dependencies.Input('gdp-mortality-scatter-graph', 'clickData'),
+        dash.dependencies.Input('age-mortality-graph', 'clickData'),
+    ],
+    [
+        dash.dependencies.State('country-selection-store', 'data'),
+    ],
+)
+def sync_country_selection(dropdown_value, map_click, alluvial_click, covid_click, gdp_click, scatter_click, age_click, current_selection):
+    triggered_id = ctx.triggered_id
+    current_selection = _normalize_selected_countries(current_selection)
+
+    if triggered_id == 'country-selector':
+        return _normalize_selected_countries(dropdown_value)
+
+    clicked_country = _extract_country_from_click(
+        map_click or alluvial_click or covid_click or gdp_click or scatter_click or age_click
+    )
+    if clicked_country in country_values:
+        return [clicked_country]
+
+    return current_selection
+
+
+@app.callback(
+    dash.dependencies.Output('country-selector', 'value'),
+    [
+        dash.dependencies.Input('country-selection-store', 'data'),
+    ],
+)
+def mirror_country_selection_to_dropdown(selected_countries):
+    return _normalize_selected_countries(selected_countries)
+
+
 @app.callback(
     dash.dependencies.Output('map-graph', 'figure'),
-    dash.dependencies.Output('date-indicator', 'children'),
+    dash.dependencies.Output('gdp-alluvial-graph', 'figure'),
+    dash.dependencies.Output('covid-evolution-graph', 'figure'),
+    dash.dependencies.Output('gdp-trend-graph', 'figure'),
+    dash.dependencies.Output('gdp-mortality-scatter-graph', 'figure'),
+    dash.dependencies.Output('age-mortality-graph', 'figure'),
+    dash.dependencies.Output('selection-summary', 'children'),
+    dash.dependencies.Output('selected-count-kpi', 'children'),
+    dash.dependencies.Output('mortality-kpi', 'children'),
+    dash.dependencies.Output('vaccination-kpi', 'children'),
     [
+        dash.dependencies.Input('country-selection-store', 'data'),
         dash.dependencies.Input('date-slider', 'value'),
         dash.dependencies.Input('metric-dropdown', 'value'),
-    ]
+    ],
 )
-def update_map(end_date_value, metric_value):
+def update_dashboard_views(selected_countries, end_date_value, metric_value):
+    selected_countries = _normalize_selected_countries(selected_countries)
     end_date = default_date if end_date_value is None else pd.to_datetime(end_date_value, unit='ms')
     df_map = prepare_map_data(df_map_base, end_date, preprocessed=True)
     metric_value = metric_value or 'total_deaths'
     color_max = max_total_deaths if metric_value == 'total_deaths' else max_cfr_pct
-    figure = generate_map_figure(df_map, end_date, metric=metric_value, color_max=color_max)
-    indicator = f"Data selecionada: {pd.to_datetime(end_date).strftime('%d/%m/%Y')}"
-    return figure, indicator
+
+    latest_data = prepare_map_data(df_health_data, preprocessed=True)
+    selected_latest = latest_data[latest_data['location'].isin(selected_countries)].copy()
+    selected_count = len(selected_countries)
+    total_deaths_million = selected_latest['total_deaths_per_million'].mean()
+    vaccination_rate = selected_latest.get('people_fully_vaccinated_per_hundred', pd.Series(dtype=float)).mean()
+
+    if pd.isna(total_deaths_million):
+        total_deaths_text = 'n/d'
+    else:
+        total_deaths_text = f'{total_deaths_million:,.1f}'
+
+    if pd.isna(vaccination_rate):
+        vaccination_text = 'n/d'
+    else:
+        vaccination_text = f'{vaccination_rate:,.1f}%'
+
+    summary_text = html.Div(
+        children=[
+            html.Span('Seleção ativa: ', className='selection-summary-label'),
+            html.Span(', '.join(selected_countries[:4]), className='selection-summary-countries'),
+            html.Span('' if len(selected_countries) <= 4 else f' +{len(selected_countries) - 4}', className='selection-summary-more'),
+        ]
+    )
+
+    return (
+        generate_map_figure(df_map, end_date, metric=metric_value, color_max=color_max, selected_country_names=selected_countries),
+        generate_gdp_alluvial_figure(allowed_country_names=selected_countries),
+        generate_covid_evolution_figure(df_health_data, selected_countries),
+        generate_gdp_trend_figure(selected_countries),
+        generate_gdp_mortality_scatter_figure(df_health_data, selected_countries),
+        generate_age_mortality_figure(df_health_data, selected_countries),
+        summary_text,
+        f'{selected_count} países',
+        f'{total_deaths_text} mortes/milhão',
+        f'{vaccination_text} totalmente vacinados',
+    )
 
 
-@app.callback(
-    dash.dependencies.Output('timeline-playing', 'data'),
-    dash.dependencies.Output('timeline-toggle', 'children'),
-    dash.dependencies.Output('timeline-speed', 'children'),
-    dash.dependencies.Output('timeline-interval', 'disabled'),
-    dash.dependencies.Output('timeline-interval', 'interval'),
-    dash.dependencies.Output('date-slider', 'value'),
-    dash.dependencies.Output('timeline-speed-index', 'data'),
-    [
-        dash.dependencies.Input('timeline-toggle', 'n_clicks'),
-        dash.dependencies.Input('timeline-speed', 'n_clicks'),
-        dash.dependencies.Input('timeline-interval', 'n_intervals'),
-    ],
-    [
-        dash.dependencies.State('timeline-playing', 'data'),
-        dash.dependencies.State('date-slider', 'value'),
-        dash.dependencies.State('timeline-speed-index', 'data'),
-    ],
-)
-def control_timeline(toggle_clicks, speed_clicks, interval_ticks, is_playing, slider_value, speed_index):
-    triggered_id = ctx.triggered_id
-    is_playing = bool(is_playing)
-    current_value = DEFAULT_DATE_MS if slider_value is None else int(slider_value)
-
-    try:
-        speed_index = int(speed_index)
-    except (TypeError, ValueError):
-        speed_index = 0
-
-    if speed_index < 0 or speed_index >= len(SPEED_STEPS):
-        speed_index = 0
-
-    speed_label, speed_interval = SPEED_STEPS[speed_index]
-
-    if triggered_id == 'timeline-toggle':
-        is_playing = not is_playing
-        if is_playing and current_value >= MAX_DATE_MS:
-            current_value = MIN_DATE_MS
-        return is_playing, ('Pause' if is_playing else 'Play'), f'Velocidade: {speed_label}', (not is_playing), speed_interval, current_value, speed_index
-
-    if triggered_id == 'timeline-speed':
-        next_speed_index = (speed_index + 1) % len(SPEED_STEPS)
-        next_speed_label, next_speed_interval = SPEED_STEPS[next_speed_index]
-        return is_playing, ('Pause' if is_playing else 'Play'), f'Velocidade: {next_speed_label}', (not is_playing), next_speed_interval, current_value, next_speed_index
-
-    if triggered_id == 'timeline-interval' and is_playing:
-        next_value = min(current_value + DAY_IN_MS, MAX_DATE_MS)
-        if next_value >= MAX_DATE_MS:
-            return False, 'Play', f'Velocidade: {speed_label}', True, speed_interval, MAX_DATE_MS, speed_index
-
-        return True, 'Pause', f'Velocidade: {speed_label}', False, speed_interval, next_value, speed_index
-
-    return is_playing, ('Pause' if is_playing else 'Play'), f'Velocidade: {speed_label}', (not is_playing), speed_interval, current_value, speed_index
 app.layout = html.Div(
     children=[
-        html.H1(
-            children='CoVID-19 Dashboard',
-            className='dashboard-title',
+        dcc.Store(id='country-selection-store', data=default_countries),
+        html.Div(
+            children=[
+                html.Div(
+                    children=[
+                        html.Div('CoVID-19 Dashboard', className='dashboard-title'),
+                        html.Div(
+                            'Vista coordenada para explorar a evolução temporal da pandemia, a relação com o PIB e hipóteses demográficas.',
+                            className='dashboard-subtitle',
+                        ),
+                    ],
+                    className='dashboard-hero-copy',
+                ),
+            ],
+            className='dashboard-hero',
+        ),
+        # Left collapsible sidebar (appears on hover)
+        html.Div(
+            id='left-sidebar',
+            children=[
+                html.Div(
+                    className='left-sidebar-inner',
+                    children=[
+                        html.Button(
+                            children=[
+                                html.Span(className='hamburger-line'),
+                                html.Span(className='hamburger-line'),
+                                html.Span(className='hamburger-line'),
+                            ],
+                            id='sidebar-toggle',
+                            n_clicks=0,
+                            className='left-sidebar-icon',
+                            title='Abrir filtros',
+                        ),
+                        html.Div(
+                            className='left-panel sidebar-contents',
+                            children=[
+                                html.Div('País e data', className='control-card-title'),
+                                dcc.Dropdown(
+                                    id='metric-dropdown',
+                                    options=[
+                                        {'label': 'Mortes acumuladas', 'value': 'total_deaths'},
+                                        {'label': 'CFR (%)', 'value': 'cfr_pct'},
+                                    ],
+                                    value='total_deaths',
+                                    clearable=False,
+                                    className='metric-dropdown',
+                                ),
+                                dcc.Dropdown(
+                                    id='country-selector',
+                                    options=country_options,
+                                    value=default_countries,
+                                    multi=True,
+                                    clearable=False,
+                                    placeholder='Escolhe um ou mais países',
+                                    className='country-selector',
+                                ),
+                                dcc.Slider(
+                                    id='date-slider',
+                                    min=MIN_DATE_MS,
+                                    max=MAX_DATE_MS,
+                                    value=DEFAULT_DATE_MS,
+                                    step=DAY_IN_MS,
+                                    marks=date_marks,
+                                    updatemode='mouseup',
+                                    tooltip={"always_visible": False, "placement": "bottom"},
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
+            ],
         ),
         html.Div(
             children=[
@@ -131,73 +292,126 @@ app.layout = html.Div(
                     children=[
                         html.Div(
                             children=[
-                                html.Button('Play', id='timeline-toggle', n_clicks=0, className='timeline-button'),
-                                html.Button('Velocidade: 1x', id='timeline-speed', n_clicks=0, className='timeline-button'),
+                                html.Div('Mapa global coordenado', className='panel-title'),
+                                html.Div(id='selection-summary', className='selection-summary'),
                             ],
-                            className='timeline-buttons',
+                            className='panel-header',
                         ),
-                        dcc.Dropdown(
-                            id='metric-dropdown',
-                            options=[
-                                {'label': 'Mortes acumuladas', 'value': 'total_deaths'},
-                                {'label': 'CFR (%)', 'value': 'cfr_pct'},
-                            ],
-                            value='total_deaths',
-                            clearable=False,
-                        ),
-                        html.Div(
-                            id='date-indicator',
-                            children=f"Data selecionada: {pd.to_datetime(DEFAULT_DATE_MS, unit='ms').strftime('%d/%m/%Y')}",
-                            className='date-indicator',
+                        dcc.Graph(
+                            id='map-graph',
+                            figure=generate_map_figure(
+                                prepare_map_data(df_map_base, default_date, preprocessed=True),
+                                default_date,
+                                metric='total_deaths',
+                                color_max=max_total_deaths,
+                                selected_country_names=default_countries,
+                            ),
+                            className='dashboard-graph dashboard-graph--map',
+                            config={'displayModeBar': False, 'responsive': True},
                         ),
                     ],
-                    className='timeline-topbar',
+                    className='dashboard-card dashboard-card--main',
                 ),
-                dcc.Slider(
-                    id='date-slider',
-                    min=MIN_DATE_MS,
-                    max=MAX_DATE_MS,
-                    value=DEFAULT_DATE_MS,
-                    step=DAY_IN_MS,
-                    marks=date_marks,
-                    updatemode='mouseup',
-                    # 1. Isso desativa a caixinha (tooltip) com o número gigante ao arrastar
-                    tooltip={"always_visible": False, "placement": "bottom"}, 
+                html.Div(
+                    children=[
+                        html.Div(
+                            children=[
+                                html.Div('Sinal e contexto', className='panel-title'),
+                                html.Div('O painel lateral agrega o diagrama alluvial e KPIs dinâmicos da seleção ativa.', className='panel-caption'),
+                            ],
+                            className='panel-header panel-header--stacked',
+                        ),
+                        html.Div(
+                            children=[
+                                html.Div('Países selecionados', className='kpi-title'),
+                                html.Div(id='selected-count-kpi', className='kpi-value'),
+                            ],
+                            className='kpi-card',
+                        ),
+                        html.Div(
+                            children=[
+                                html.Div('Mortes médias por milhão', className='kpi-title'),
+                                html.Div(id='mortality-kpi', className='kpi-value'),
+                            ],
+                            className='kpi-card',
+                        ),
+                        html.Div(
+                            children=[
+                                html.Div('Vacinação completa média', className='kpi-title'),
+                                html.Div(id='vaccination-kpi', className='kpi-value'),
+                            ],
+                            className='kpi-card',
+                        ),
+                        html.Div(
+                            children=[
+                                html.Div('Evolução do PIB por país', className='gdp-alluvial-title'),
+                                dcc.Graph(
+                                    id='gdp-alluvial-graph',
+                                    figure=generate_gdp_alluvial_figure(allowed_country_names=default_countries),
+                                    className='gdp-alluvial-graph',
+                                    config={'displayModeBar': False, 'responsive': True},
+                                ),
+                            ],
+                            className='insight-card insight-card--chart',
+                        ),
+                    ],
+                    className='dashboard-sidebar',
                 ),
-                dcc.Interval(
-                    id='timeline-interval',
-                    interval=1500,
-                    n_intervals=0,
-                    disabled=True,
-                ),
-                dcc.Store(id='timeline-playing', data=False),
-                dcc.Store(id='timeline-speed-index', data=0),
             ],
-            className='dashboard-card',
-        ),
-        dcc.Graph(
-            id='map-graph',
-            figure=generate_map_figure(
-                prepare_map_data(df_map_base, default_date, preprocessed=True),
-                default_date,
-                metric='total_deaths',
-                color_max=max_total_deaths,
-            ),
-            className='dashboard-graph',
-            style={'width': '100%', 'height': '760px'},
-            config={'displayModeBar': False, 'responsive': True},
+            className='dashboard-stage',
         ),
         html.Div(
             children=[
-                html.Div('Evolução do PIB por país', className='gdp-alluvial-title'),
-                dcc.Graph(
-                    id='gdp-alluvial-graph',
-                    figure=generate_gdp_alluvial_figure(allowed_country_names=df_map_base['location'].unique()),
-                    className='gdp-alluvial-graph',
-                    config={'displayModeBar': False, 'responsive': True},
+                html.Div(
+                    children=[
+                        html.Div('Evolução pandémica', className='panel-title'),
+                        dcc.Graph(
+                            id='covid-evolution-graph',
+                            figure=generate_covid_evolution_figure(df_health_data, default_countries),
+                            className='report-graph report-graph-wide',
+                            config={'displayModeBar': False, 'responsive': True},
+                        ),
+                    ],
+                    className='chart-card chart-card--wide',
+                ),
+                html.Div(
+                    children=[
+                        html.Div('PIB e resiliência económica', className='panel-title'),
+                        dcc.Graph(
+                            id='gdp-trend-graph',
+                            figure=generate_gdp_trend_figure(default_countries),
+                            className='report-graph report-graph-medium',
+                            config={'displayModeBar': False, 'responsive': True},
+                        ),
+                    ],
+                    className='chart-card chart-card--medium',
+                ),
+                html.Div(
+                    children=[
+                        html.Div('PIB vs mortalidade', className='panel-title'),
+                        dcc.Graph(
+                            id='gdp-mortality-scatter-graph',
+                            figure=generate_gdp_mortality_scatter_figure(df_health_data, default_countries),
+                            className='report-graph report-graph-half',
+                            config={'displayModeBar': False, 'responsive': True},
+                        ),
+                    ],
+                    className='chart-card',
+                ),
+                html.Div(
+                    children=[
+                        html.Div('Envelhecimento e mortalidade', className='panel-title'),
+                        dcc.Graph(
+                            id='age-mortality-graph',
+                            figure=generate_age_mortality_figure(df_health_data, default_countries),
+                            className='report-graph report-graph-half',
+                            config={'displayModeBar': False, 'responsive': True},
+                        ),
+                    ],
+                    className='chart-card',
                 ),
             ],
-            className='gdp-alluvial-panel',
+            className='dashboard-grid',
         ),
     ],
     className='dashboard-shell',
