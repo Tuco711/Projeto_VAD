@@ -1,5 +1,6 @@
 import dash
 import pandas as pd
+import numpy as np
 from dash import html, dcc, ctx
 try:
     from .data_manipulation import (
@@ -177,7 +178,11 @@ def update_dashboard_views(selected_countries, end_date_value, metric_value):
     selected_latest = latest_data[latest_data['location'].isin(selected_countries)].copy()
     selected_count = len(selected_countries)
     total_deaths_million = selected_latest['total_deaths_per_million'].mean()
-    vaccination_rate = selected_latest.get('people_fully_vaccinated_per_hundred', pd.Series(dtype=float)).mean()
+    # Calcular vacinação completa se a coluna existe, senão retorna NaN
+    if 'people_fully_vaccinated_per_hundred' in selected_latest.columns:
+        vaccination_rate = selected_latest['people_fully_vaccinated_per_hundred'].mean()
+    else:
+        vaccination_rate = np.nan
 
     if pd.isna(total_deaths_million):
         total_deaths_text = 'n/d'
@@ -312,7 +317,6 @@ app.layout = html.Div(
                     ],
                     className='dashboard-card dashboard-card--main',
                 ),
-<<<<<<< HEAD
                 html.Div(
                     children=[
                         html.Div(
@@ -355,8 +359,9 @@ app.layout = html.Div(
                             ],
                             className='insight-card insight-card--chart',
                         ),
-                    ),
-                        className='dashboard-sidebar',
+                    ],
+                    className='dashboard-sidebar',
+                ),
             ],
             className='dashboard-stage',
         ),
