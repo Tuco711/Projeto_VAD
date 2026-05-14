@@ -355,26 +355,8 @@ app.layout = html.Div(
                             ],
                             className='insight-card insight-card--chart',
                         ),
-                    ],
-                    className='dashboard-sidebar',
-=======
-                dcc.Slider(
-                    id='date-slider',
-                    min=MIN_DATE_MS,
-                    max=MAX_DATE_MS,
-                    value=DEFAULT_DATE_MS,
-                    step=DAY_IN_MS,
-                    marks=date_marks,
-                    updatemode='mouseup',
-                    tooltip={
-                        "always_visible": False,
-                        "placement": "bottom",
-                        "transform": "formatDate",
-                        "template": "{value}",
-                    },
-                    allow_direct_input=False, 
->>>>>>> 2c65d7f17def3fa9ed3c5c0150734e2c4eae2752
-                ),
+                    ),
+                        className='dashboard-sidebar',
             ],
             className='dashboard-stage',
         ),
