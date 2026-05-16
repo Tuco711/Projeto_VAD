@@ -140,14 +140,7 @@ def sync_country_selection(dropdown_value, map_click, alluvial_click, covid_clic
     return current_selection
 
 
-@app.callback(
-    dash.dependencies.Output('country-selector', 'value'),
-    [
-        dash.dependencies.Input('country-selection-store', 'data'),
-    ],
-)
-def mirror_country_selection_to_dropdown(selected_countries):
-    return _normalize_selected_countries(selected_countries)
+
 
 
 @app.callback(
@@ -283,7 +276,13 @@ app.layout = html.Div(
                                     step=DAY_IN_MS,
                                     marks=date_marks,
                                     updatemode='mouseup',
-                                    tooltip={"always_visible": False, "placement": "bottom"},
+                                    allow_direct_input=False, 
+                                    tooltip={
+                                    "always_visible": False,
+                                    "placement": "bottom",
+                                    "transform": "formatDate",
+                                    "template": "{value}",
+                                    },
                                 ),
                             ],
                         ),
