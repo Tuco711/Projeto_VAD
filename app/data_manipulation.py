@@ -487,6 +487,34 @@ def generate_gdp_trend_figure(selected_country_names=None, filepath: Path = GDP_
     return fig
 
 
+def _compute_padding_for_marker_size(max_size_value, sizeref, x_data_range, y_data_range):
+    """
+    Compute padding in data units for axes based on marker size.
+    Assumes sizemode='diameter' and standard plot dimensions.
+    Returns (padding_x, padding_y).
+    """
+    if max_size_value <= 0 or sizeref <= 0:
+        return 0, 0
+    
+    # Plotly formula: pixel_diameter = sqrt(2 * value / sizeref)
+    marker_pixel_diameter = np.sqrt(2 * max_size_value / sizeref)
+    marker_pixel_radius = marker_pixel_diameter / 2
+    
+    # Estimate padding: standard Plotly plot dimensions (height=450, margins ~100px → plot_height ~350px)
+    # Typical aspect ratio ~ 1.3:1 → plot_width ~ 460px
+    standard_plot_width = 460
+    standard_plot_height = 350
+    
+    # Add 1.5x the marker radius for visual safety margin
+    padding_px = marker_pixel_radius * 1.5
+    
+    # Convert to data units
+    padding_x = (padding_px / standard_plot_width) * x_data_range if x_data_range > 0 else 0
+    padding_y = (padding_px / standard_plot_height) * y_data_range if y_data_range > 0 else 0
+    
+    return padding_x, padding_y
+
+
 def generate_gdp_mortality_scatter_figure(df_health: pd.DataFrame, selected_country_names=None, filepath: Path = GDP_FILEPATH):
     df = _prepare_covid_metrics(df_health)
     selected_country_names = _resolve_country_selection(df, selected_country_names, top_n=8)
@@ -512,11 +540,34 @@ def generate_gdp_mortality_scatter_figure(df_health: pd.DataFrame, selected_coun
         )
         if not df_merged.empty:
             df_merged['continent'] = 'World'
+            # If World total_deaths_per_million is NaN, compute from non-aggregate countries
+            if pd.isna(df_merged.iloc[0].get('total_deaths_per_million')):
+                non_agg = df_latest[~df_latest['location'].isin(['World', 'International', 'European Union'])].copy()
+                if not non_agg.empty and 'total_deaths_per_million' in non_agg.columns:
+                    # Get the weighted average by population
+                    non_agg_clean = non_agg.dropna(subset=['total_deaths_per_million', 'population'])
+                    if not non_agg_clean.empty:
+                        weighted_avg = (non_agg_clean['total_deaths_per_million'] * non_agg_clean['population']).sum() / non_agg_clean['population'].sum()
+                        df_merged.loc[df_merged.index[0], 'total_deaths_per_million'] = weighted_avg
     else:
         df_merged = df_latest.merge(df_gdp, left_on='iso_code', right_on='Country Code', how='inner')
         df_merged = df_merged[df_merged['location'].isin(selected_country_names)].copy()
 
     df_merged = df_merged.dropna(subset=['gdp_growth_pct', 'total_deaths_per_million'])
+
+    # Prepare size series for markers (population in millions), cap extreme outliers
+    if 'population' in df_merged.columns:
+        size_series_gdp = (df_merged['population'] / 1_000_000).fillna(0).clip(lower=0)
+        q = 0.95
+        cap_value = size_series_gdp.quantile(q) if not size_series_gdp.empty else size_series_gdp.max()
+        capped_max = min(size_series_gdp.max(), cap_value) if cap_value > 0 else size_series_gdp.max()
+        desired_px_gdp = 15
+        sizeref_gdp = 2 * capped_max / (desired_px_gdp ** 2) if capped_max > 0 else 1
+        # use capped sizes for visual stability
+        size_values_gdp = size_series_gdp.clip(upper=cap_value)
+    else:
+        size_values_gdp = pd.Series(dtype=float)
+        sizeref_gdp = 1
 
     # Criar colormap por continente
     continent_colors = {
@@ -540,10 +591,10 @@ def generate_gdp_mortality_scatter_figure(df_health: pd.DataFrame, selected_coun
             mode='markers',
             name=continent or 'Dados',
             marker=dict(
-                size=df_continent['population'] / 1_000_000 if 'population' in df_continent.columns else 10,
+                size=(size_values_gdp.loc[df_continent.index].values if 'population' in df_continent.columns else 10),
                 color=continent_colors.get(continent, COLOR_PALETTE['primary']) if continent else COLOR_PALETTE['primary'],
                 sizemode='diameter',
-                sizeref=2 * max(df_merged['population'] / 1_000_000) / (44 ** 2) if 'population' in df_merged.columns else 1,
+                sizeref=sizeref_gdp,
                 line=dict(color='white', width=1.5),
                 opacity=0.75
             ),
@@ -551,7 +602,8 @@ def generate_gdp_mortality_scatter_figure(df_health: pd.DataFrame, selected_coun
             hovertemplate='<b>%{text}</b><br>PIB crescimento: %{x:.1f}%<br>Mortes: %{y:,.0f}/1M<extra></extra>',
         ))
 
-    fig.update_layout(
+    # Compute padding based on largest marker size to ensure proper zoom (only if data exists)
+    layout_update = dict(
         template='plotly_white',
         height=450,
         margin=dict(t=80, l=50, r=20, b=30),
@@ -585,6 +637,44 @@ def generate_gdp_mortality_scatter_figure(df_health: pd.DataFrame, selected_coun
             borderwidth=1
         )
     )
+    
+    fig.update_layout(**layout_update)
+    
+    # Apply proportional zoom only if data exists
+    if not df_merged.empty:
+        x_range = df_merged['gdp_growth_pct'].max() - df_merged['gdp_growth_pct'].min()
+        y_range = df_merged['total_deaths_per_million'].max() - df_merged['total_deaths_per_million'].min()
+        
+        # For single data point, provide reasonable padding instead of zero range
+        if x_range == 0:
+            x_center = df_merged['gdp_growth_pct'].iloc[0]
+            x_range = 10  # Default range of ±5% for single point
+        if y_range == 0:
+            y_center = df_merged['total_deaths_per_million'].iloc[0]
+            y_range = 500  # Default range of ±250 deaths/1M for single point
+        
+        pad_x, pad_y = _compute_padding_for_marker_size(capped_max, sizeref_gdp, x_range, y_range)
+        x_min = df_merged['gdp_growth_pct'].min() - pad_x
+        x_max = df_merged['gdp_growth_pct'].max() + pad_x
+        y_min = df_merged['total_deaths_per_million'].min() - pad_y
+        y_max = df_merged['total_deaths_per_million'].max() + pad_y
+        
+        # For single point, ensure minimum spacing
+        if df_merged.shape[0] == 1:
+            x_center = df_merged['gdp_growth_pct'].iloc[0]
+            y_center = df_merged['total_deaths_per_million'].iloc[0]
+            # Create symmetric range around the single point
+            x_span = max(abs(x_center * 0.2), 5) if x_center != 0 else 5
+            y_span = max(abs(y_center * 0.2), 250) if y_center != 0 else 250
+            x_min = x_center - x_span
+            x_max = x_center + x_span
+            y_min = y_center - y_span
+            y_max = y_center + y_span
+        
+        fig.update_layout(
+            xaxis=dict(range=[x_min, x_max]),
+            yaxis=dict(range=[y_min, y_max])
+        )
 
     return fig
 
@@ -596,12 +686,35 @@ def generate_age_mortality_figure(df_health: pd.DataFrame, selected_country_name
     required_columns = ['location', 'continent', 'median_age', 'aged_65_older', 'total_deaths_per_million', 'gdp_per_capita']
     available_columns = [column for column in required_columns if column in df.columns]
     df_latest = prepare_map_data(df, preprocessed=True)[available_columns].copy()
+    
+    # For World selection, handle NaN total_deaths_per_million
+    if selected_country_names == ['World']:
+        world_row = df_latest[df_latest['location'] == 'World']
+        if not world_row.empty and pd.isna(world_row.iloc[0].get('total_deaths_per_million')):
+            # Compute World's total_deaths_per_million from non-aggregate countries
+            non_agg = df_latest[~df_latest['location'].isin(['World', 'International', 'European Union'])].copy()
+            if not non_agg.empty and 'total_deaths_per_million' in non_agg.columns:
+                non_agg_clean = non_agg.dropna(subset=['total_deaths_per_million', 'population'] if 'population' in non_agg.columns else ['total_deaths_per_million'])
+                if not non_agg_clean.empty:
+                    if 'population' in non_agg_clean.columns:
+                        weighted_avg = (non_agg_clean['total_deaths_per_million'] * non_agg_clean['population']).sum() / non_agg_clean['population'].sum()
+                    else:
+                        weighted_avg = non_agg_clean['total_deaths_per_million'].mean()
+                    df_latest.loc[df_latest['location'] == 'World', 'total_deaths_per_million'] = weighted_avg
+    
     df_latest = df_latest[df_latest['location'].isin(selected_country_names)].dropna(subset=['median_age', 'total_deaths_per_million'])
 
     gdp_series = pd.to_numeric(df_latest['gdp_per_capita'], errors='coerce') if 'gdp_per_capita' in df_latest.columns else pd.Series(dtype=float)
     gdp_fallback = gdp_series.dropna().median() if not gdp_series.dropna().empty else 50_000
-    marker_sizes = gdp_series.fillna(gdp_fallback).div(5_000) if not gdp_series.empty else pd.Series(dtype=float)
-    sizeref = 2 * marker_sizes.max() / (44 ** 2) if not marker_sizes.empty else 1
+    # Convert to a relative size (divide to keep numbers reasonable), fill NaNs and clip lower bound
+    size_series_age = gdp_series.fillna(gdp_fallback).div(5_000) if not gdp_series.empty else pd.Series(dtype=float)
+    size_series_age = size_series_age.clip(lower=0)
+    q = 0.95
+    cap_value_age = size_series_age.quantile(q) if not size_series_age.empty else size_series_age.max()
+    capped_max_age = min(size_series_age.max(), cap_value_age) if cap_value_age > 0 else size_series_age.max()
+    desired_px_age = 12
+    sizeref = 2 * capped_max_age / (desired_px_age ** 2) if capped_max_age > 0 else 1
+    size_values_age = size_series_age.clip(upper=cap_value_age)
 
     # Criar colormap por continente
     continent_colors = {
@@ -614,17 +727,20 @@ def generate_age_mortality_figure(df_health: pd.DataFrame, selected_country_name
 
     fig = go.Figure()
     
-    for continent in (df_latest['continent'].unique() if 'continent' in df_latest.columns else [None]):
-        df_continent = df_latest[df_latest['continent'] == continent] if continent else df_latest
+    # Get unique continents, handling NaN
+    continents = [c for c in (df_latest['continent'].unique() if 'continent' in df_latest.columns else [None]) if pd.notna(c)]
+    has_nan_continent = (df_latest['continent'].isna().any() if 'continent' in df_latest.columns else False)
+    
+    for continent in continents:
+        df_continent = df_latest[df_latest['continent'] == continent]
         
         fig.add_trace(go.Scatter(
             x=df_continent['median_age'],
             y=df_continent['total_deaths_per_million'],
             mode='markers',
             name=continent or 'Dados',
-            marker=dict(
-                size=(pd.to_numeric(df_continent['gdp_per_capita'], errors='coerce').fillna(gdp_fallback).div(5_000)
-                      if 'gdp_per_capita' in df_continent.columns else 10),
+                marker=dict(
+                size=(size_values_age.loc[df_continent.index].values if 'gdp_per_capita' in df_continent.columns else 10),
                 color=continent_colors.get(continent, COLOR_PALETTE['primary']) if continent else COLOR_PALETTE['primary'],
                 sizemode='diameter',
                 sizeref=sizeref,
@@ -634,7 +750,28 @@ def generate_age_mortality_figure(df_health: pd.DataFrame, selected_country_name
             text=df_continent['location'],
             hovertemplate='<b>%{text}</b><br>Idade mediana: %{x:.1f}<br>Mortes: %{y:,.0f}/1M<extra></extra>',
         ))
+    
+    # Add trace for NaN continent (World)
+    if has_nan_continent:
+        df_world = df_latest[df_latest['continent'].isna()]
+        fig.add_trace(go.Scatter(
+            x=df_world['median_age'],
+            y=df_world['total_deaths_per_million'],
+            mode='markers',
+            name='World',
+                marker=dict(
+                size=(size_values_age.loc[df_world.index].values if 'gdp_per_capita' in df_world.columns else 10),
+                color=COLOR_PALETTE['primary'],
+                sizemode='diameter',
+                sizeref=sizeref,
+                line=dict(color='white', width=1.5),
+                opacity=0.75
+            ),
+            text=df_world['location'],
+            hovertemplate='<b>%{text}</b><br>Idade mediana: %{x:.1f}<br>Mortes: %{y:,.0f}/1M<extra></extra>',
+        ))
 
+    # Compute padding based on largest marker size to ensure proper zoom (only if data exists)
     fig.update_layout(
         template='plotly_white',
         height=450,
@@ -667,6 +804,40 @@ def generate_age_mortality_figure(df_health: pd.DataFrame, selected_country_name
             borderwidth=1
         )
     )
+    
+    # Apply proportional zoom only if data exists
+    if not df_latest.empty:
+        x_range_age = df_latest['median_age'].max() - df_latest['median_age'].min()
+        y_range_age = df_latest['total_deaths_per_million'].max() - df_latest['total_deaths_per_million'].min()
+        
+        # For single data point, provide reasonable padding instead of zero range
+        if x_range_age == 0:
+            x_range_age = 10  # Default range of ±5 years for single point
+        if y_range_age == 0:
+            y_range_age = 500  # Default range of ±250 deaths/1M for single point
+        
+        pad_x_age, pad_y_age = _compute_padding_for_marker_size(capped_max_age, sizeref, x_range_age, y_range_age)
+        x_min_age = df_latest['median_age'].min() - pad_x_age
+        x_max_age = df_latest['median_age'].max() + pad_x_age
+        y_min_age = df_latest['total_deaths_per_million'].min() - pad_y_age
+        y_max_age = df_latest['total_deaths_per_million'].max() + pad_y_age
+        
+        # For single point, ensure minimum spacing
+        if df_latest.shape[0] == 1:
+            x_center = df_latest['median_age'].iloc[0]
+            y_center = df_latest['total_deaths_per_million'].iloc[0]
+            # Create symmetric range around the single point
+            x_span = max(abs(x_center * 0.2), 5) if x_center != 0 else 5
+            y_span = max(abs(y_center * 0.2), 250) if y_center != 0 else 250
+            x_min_age = x_center - x_span
+            x_max_age = x_center + x_span
+            y_min_age = y_center - y_span
+            y_max_age = y_center + y_span
+        
+        fig.update_layout(
+            xaxis=dict(range=[x_min_age, x_max_age]),
+            yaxis=dict(range=[y_min_age, y_max_age])
+        )
 
     return fig
 
