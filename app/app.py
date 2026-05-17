@@ -8,13 +8,13 @@ try:
         FILEPATH,
         build_map_base_data,
         prepare_map_data,
-        generate_date_slider_marks,
-        generate_map_figure,
-        generate_gdp_alluvial_figure,
-        generate_covid_evolution_figure,
-        generate_gdp_trend_figure,
-        generate_gdp_mortality_scatter_figure,
-        generate_age_mortality_figure,
+        date_slider_marks,
+        map_figure,
+        gdp_alluvial_figure,
+        covid_evolution_figure,
+        gdp_trend_figure,
+        gdp_mortality_scatter_figure,
+        age_mortality_figure,
     )
 except ImportError:
     from data_manipulation import (
@@ -22,13 +22,13 @@ except ImportError:
         FILEPATH,
         build_map_base_data,
         prepare_map_data,
-        generate_date_slider_marks,
-        generate_map_figure,
-        generate_gdp_alluvial_figure,
-        generate_covid_evolution_figure,
-        generate_gdp_trend_figure,
-        generate_gdp_mortality_scatter_figure,
-        generate_age_mortality_figure,
+        date_slider_marks,
+        map_figure,
+        gdp_alluvial_figure,
+        covid_evolution_figure,
+        gdp_trend_figure,
+        gdp_mortality_scatter_figure,
+        age_mortality_figure,
     )
 
 app = dash.Dash(__name__)
@@ -41,7 +41,7 @@ if df_health is None:
 assert df_health is not None
 df_health_data: pd.DataFrame = df_health
 
-date_marks = generate_date_slider_marks(df_health, num_marks=3)
+date_marks = date_slider_marks(df_health, num_marks=3)
 df_map_base = build_map_base_data(df_health)
 min_date = df_health['date'].min()
 max_date = df_health['date'].max()
@@ -196,12 +196,12 @@ def update_dashboard_views(selected_countries, end_date_value, metric_value):
     )
 
     return (
-        generate_map_figure(df_map, end_date, metric=metric_value, color_max=color_max, selected_country_names=selected_countries),
-        generate_gdp_alluvial_figure(allowed_country_names=selected_countries),
-        generate_covid_evolution_figure(df_health_data, selected_countries),
-        generate_gdp_trend_figure(selected_countries),
-        generate_gdp_mortality_scatter_figure(df_health_data, selected_countries),
-        generate_age_mortality_figure(df_health_data, selected_countries),
+        map_figure(df_map, end_date, metric=metric_value, color_max=color_max, selected_country_names=selected_countries),
+        gdp_alluvial_figure(allowed_country_names=selected_countries),
+        covid_evolution_figure(df_health_data, selected_countries),
+        gdp_trend_figure(selected_countries),
+        gdp_mortality_scatter_figure(df_health_data, selected_countries),
+        age_mortality_figure(df_health_data, selected_countries),
         summary_text,
         f'{selected_count} países',
         f'{total_deaths_text} mortes/milhão',
@@ -218,7 +218,7 @@ app.layout = html.Div(
                     children=[
                         html.Div('CoVID-19 Dashboard', className='dashboard-title'),
                         html.Div(
-                            'Vista coordenada para explorar a evolução temporal da pandemia, a relação com o PIB e hipóteses demográficas.',
+                            'Veja como a pandemia de CoVID-19 evoluiu, como afetou o PIB e aspetos demográficos a nível mundial.',
                             className='dashboard-subtitle',
                         ),
                     ],
@@ -248,12 +248,12 @@ app.layout = html.Div(
                         html.Div(
                             className='left-panel sidebar-contents',
                             children=[
-                                html.Div('País e data', className='control-card-title'),
+                                html.Div('País e Data', className='control-card-title'),
                                 dcc.Dropdown(
                                     id='metric-dropdown',
                                     options=[
                                         {'label': 'Mortes acumuladas', 'value': 'total_deaths'},
-                                        {'label': 'CFR (%)', 'value': 'cfr_pct'},
+                                        {'label': 'Case Fatality Ratio (%)', 'value': 'cfr_pct'},
                                     ],
                                     value='total_deaths',
                                     clearable=False,
@@ -265,7 +265,7 @@ app.layout = html.Div(
                                     value=default_countries,
                                     multi=True,
                                     clearable=False,
-                                    placeholder='Escolhe um ou mais países',
+                                    placeholder='Selecione um ou mais países',
                                     className='country-selector',
                                 ),
                                 dcc.Slider(
@@ -276,13 +276,7 @@ app.layout = html.Div(
                                     step=DAY_IN_MS,
                                     marks=date_marks,
                                     updatemode='mouseup',
-                                    allow_direct_input=False, 
-                                    tooltip={
-                                    "always_visible": False,
-                                    "placement": "bottom",
-                                    "transform": "formatDate",
-                                    "template": "{value}",
-                                    },
+                                    tooltip={"always_visible": False, "placement": "bottom"},
                                 ),
                             ],
                         ),
@@ -296,14 +290,14 @@ app.layout = html.Div(
                     children=[
                         html.Div(
                             children=[
-                                html.Div('Mapa global coordenado', className='panel-title'),
+                                html.Div('Mapa Global', className='panel-title'),
                                 html.Div(id='selection-summary', className='selection-summary'),
                             ],
                             className='panel-header',
                         ),
                         dcc.Graph(
                             id='map-graph',
-                            figure=generate_map_figure(
+                            figure=map_figure(
                                 prepare_map_data(df_map_base, default_date, preprocessed=True),
                                 default_date,
                                 metric='total_deaths',
@@ -316,87 +310,88 @@ app.layout = html.Div(
                     ],
                     className='dashboard-card dashboard-card--main',
                 ),
-                html.Div(
-                    children=[
-                        html.Div(
-                            children=[
-                                html.Div('Sinal e contexto', className='panel-title'),
-                                html.Div('O painel lateral agrega o diagrama alluvial e KPIs dinâmicos da seleção ativa.', className='panel-caption'),
-                            ],
-                            className='panel-header panel-header--stacked',
-                        ),
-                        html.Div(
-                            children=[
-                                html.Div('Países selecionados', className='kpi-title'),
-                                html.Div(id='selected-count-kpi', className='kpi-value'),
-                            ],
-                            className='kpi-card',
-                        ),
-                        html.Div(
-                            children=[
-                                html.Div('Mortes médias por milhão', className='kpi-title'),
-                                html.Div(id='mortality-kpi', className='kpi-value'),
-                            ],
-                            className='kpi-card',
-                        ),
-                        html.Div(
-                            children=[
-                                html.Div('Vacinação completa média', className='kpi-title'),
-                                html.Div(id='vaccination-kpi', className='kpi-value'),
-                            ],
-                            className='kpi-card',
-                        ),
-                        html.Div(
-                            children=[
-                                html.Div('Evolução do PIB por país', className='gdp-alluvial-title'),
-                                dcc.Graph(
-                                    id='gdp-alluvial-graph',
-                                    figure=generate_gdp_alluvial_figure(allowed_country_names=default_countries),
-                                    className='gdp-alluvial-graph',
-                                    config={'displayModeBar': False, 'responsive': True},
-                                ),
-                            ],
-                            className='insight-card insight-card--chart',
-                        ),
-                    ],
-                    className='dashboard-sidebar',
-                ),
             ],
             className='dashboard-stage',
         ),
+
         html.Div(
             children=[
+                html.Div(
+                    children=[
+                        html.Div('Contexto e indicadores', className='panel-title'),
+                        html.Div('Seleção ativa e resumo da situação.', className='panel-caption'),
+                        html.Div(
+                            children=[
+                                html.Div(
+                                    children=[
+                                        html.Div('Países selecionados', className='kpi-title'),
+                                        html.Div(id='selected-count-kpi', className='kpi-value'),
+                                    ],
+                                    className='kpi-card',
+                                ),
+                                html.Div(
+                                    children=[
+                                        html.Div('Mortes médias por milhão', className='kpi-title'),
+                                        html.Div(id='mortality-kpi', className='kpi-value'),
+                                    ],
+                                    className='kpi-card',
+                                ),
+                                html.Div(
+                                    children=[
+                                        html.Div('Vacinação completa média', className='kpi-title'),
+                                        html.Div(id='vaccination-kpi', className='kpi-value'),
+                                    ],
+                                    className='kpi-card',
+                                ),
+                            ],
+                            className='kpi-blocks',
+                        ),
+                    ],
+                    className='chart-card',
+                ),
+                html.Div(
+                    children=[
+                        html.Div('Evolução do PIB por país', className='panel-title'),
+                        dcc.Graph(
+                            id='gdp-alluvial-graph',
+                            figure=gdp_alluvial_figure(allowed_country_names=default_countries),
+                            className='report-graph',
+                            config={'displayModeBar': False, 'responsive': True},
+                        ),
+                    ],
+                    className='chart-card',
+                ),
                 html.Div(
                     children=[
                         html.Div('Evolução pandémica', className='panel-title'),
                         dcc.Graph(
                             id='covid-evolution-graph',
-                            figure=generate_covid_evolution_figure(df_health_data, default_countries),
-                            className='report-graph report-graph-wide',
+                            figure=covid_evolution_figure(df_health_data, default_countries),
+                            className='report-graph',
                             config={'displayModeBar': False, 'responsive': True},
                         ),
                     ],
-                    className='chart-card chart-card--wide',
+                    className='chart-card',
                 ),
                 html.Div(
                     children=[
                         html.Div('PIB e resiliência económica', className='panel-title'),
                         dcc.Graph(
                             id='gdp-trend-graph',
-                            figure=generate_gdp_trend_figure(default_countries),
-                            className='report-graph report-graph-medium',
+                            figure=gdp_trend_figure(default_countries),
+                            className='report-graph',
                             config={'displayModeBar': False, 'responsive': True},
                         ),
                     ],
-                    className='chart-card chart-card--medium',
+                    className='chart-card',
                 ),
                 html.Div(
                     children=[
                         html.Div('PIB vs mortalidade', className='panel-title'),
                         dcc.Graph(
                             id='gdp-mortality-scatter-graph',
-                            figure=generate_gdp_mortality_scatter_figure(df_health_data, default_countries),
-                            className='report-graph report-graph-half',
+                            figure=gdp_mortality_scatter_figure(df_health_data, default_countries),
+                            className='report-graph',
                             config={'displayModeBar': False, 'responsive': True},
                         ),
                     ],
@@ -407,8 +402,8 @@ app.layout = html.Div(
                         html.Div('Envelhecimento e mortalidade', className='panel-title'),
                         dcc.Graph(
                             id='age-mortality-graph',
-                            figure=generate_age_mortality_figure(df_health_data, default_countries),
-                            className='report-graph report-graph-half',
+                            figure=age_mortality_figure(df_health_data, default_countries),
+                            className='report-graph',
                             config={'displayModeBar': False, 'responsive': True},
                         ),
                     ],
