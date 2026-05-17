@@ -180,15 +180,15 @@ def sync_country_selection(dropdown_value, map_click, alluvial_click, covid_clic
     [
         dash.dependencies.Input('country-selection-store', 'data'),
         dash.dependencies.Input('date-slider', 'value'),
-        dash.dependencies.Input('metric-dropdown', 'value'),
     ],
 )
-def update_dashboard_views(selected_countries, end_date_value, metric_value):
+def update_dashboard_views(selected_countries, end_date_value):
     selected_countries = _normalize_selected_countries(selected_countries)
     end_date = default_date if end_date_value is None else pd.to_datetime(end_date_value, unit='ms')
     df_map = prepare_map_data(df_map_base, end_date, preprocessed=True)
-    metric_value = metric_value or 'total_deaths'
-    color_max = max_total_deaths if metric_value == 'total_deaths' else max_cfr_pct
+    # Map metric is fixed to Total Deaths only
+    metric_value = 'total_deaths'
+    color_max = max_total_deaths
 
     map_selected_countries = [] if selected_countries == ['World'] else selected_countries
     world_only_selection = ['World'] if selected_countries == ['World'] else selected_countries
@@ -273,7 +273,7 @@ app.layout = html.Div(
                     children=[
                         html.Div('The Pandemic Lens', className='dashboard-title'),
                         html.Div(
-                            'Health, economy and demographic trends during the CoVID-19 pandemic 🌍📊',
+                            'Health, economy and demographic trends during the CoVID-19 pandemic',
                             className='dashboard-subtitle',
                         ),
                     ],
@@ -303,17 +303,7 @@ app.layout = html.Div(
                         html.Div(
                             className='left-panel sidebar-contents',
                             children=[
-                                html.Div('Country and Date', className='control-card-title'),
-                                dcc.Dropdown(
-                                    id='metric-dropdown',
-                                    options=[
-                                        {'label': 'Total Deaths', 'value': 'total_deaths'},
-                                        {'label': 'Case Fatality Ratio (%)', 'value': 'cfr_pct'},
-                                    ],
-                                    value='total_deaths',
-                                    clearable=False,
-                                    className='metric-dropdown',
-                                ),
+                                html.Div('Filters', className='control-card-title'),
                                 dcc.Dropdown(
                                     id='country-selector',
                                     options=country_options,

@@ -1164,7 +1164,7 @@ def map_figure(df_map: pd.DataFrame, end_date=None, metric='total_deaths', color
             showland=True,
             landcolor='rgba(241, 245, 249, 0.9)',
         ),
-        uirevision='country-selection'
+        uirevision='country-selection',
     )
 
     return _apply_style_template(fig, height=620)
