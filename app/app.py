@@ -109,6 +109,33 @@ def _extract_country_from_click(click_data):
 
     return None
 
+
+def _mean_latest_valid_metric(df: pd.DataFrame, selected_countries, metric: str):
+    if metric not in df.columns:
+        return np.nan
+
+    df_metric = df[[col for col in ['location', 'date', metric] if col in df.columns]].copy()
+    if 'location' not in df_metric.columns or 'date' not in df_metric.columns:
+        return np.nan
+
+    df_metric = df_metric[df_metric['location'].isin(selected_countries)].copy()
+    if df_metric.empty:
+        return np.nan
+
+    df_metric['date'] = pd.to_datetime(df_metric['date'])
+    df_metric = df_metric.sort_values(['location', 'date'])
+
+    latest_valid_values = []
+    for _, country_df in df_metric.groupby('location', sort=False):
+        valid_values = country_df[metric].dropna()
+        if not valid_values.empty:
+            latest_valid_values.append(valid_values.iloc[-1])
+
+    if not latest_valid_values:
+        return np.nan
+
+    return float(np.mean(latest_valid_values))
+
 @app.callback(
     dash.dependencies.Output('country-selection-store', 'data'),
     [
@@ -171,11 +198,11 @@ def update_dashboard_views(selected_countries, end_date_value, metric_value):
     selected_latest = latest_data[latest_data['location'].isin(selected_countries)].copy()
     selected_count = len(selected_countries)
     total_deaths_million = selected_latest['total_deaths_per_million'].mean()
-    # Calcular vacinação completa se a coluna existe, senão retorna NaN
-    if 'people_fully_vaccinated_per_hundred' in selected_latest.columns:
-        vaccination_rate = selected_latest['people_fully_vaccinated_per_hundred'].mean()
-    else:
-        vaccination_rate = np.nan
+    vaccination_rate = _mean_latest_valid_metric(
+        df_health_data,
+        selected_countries,
+        'people_fully_vaccinated_per_hundred',
+    )
 
     if pd.isna(total_deaths_million):
         total_deaths_text = 'n/d'
@@ -189,7 +216,7 @@ def update_dashboard_views(selected_countries, end_date_value, metric_value):
 
     summary_text = html.Div(
         children=[
-            html.Span('Seleção ativa: ', className='selection-summary-label'),
+            html.Span('Active Selection: ', className='selection-summary-label'),
             html.Span(', '.join(selected_countries[:4]), className='selection-summary-countries'),
             html.Span('' if len(selected_countries) <= 4 else f' +{len(selected_countries) - 4}', className='selection-summary-more'),
         ]
@@ -203,9 +230,9 @@ def update_dashboard_views(selected_countries, end_date_value, metric_value):
         gdp_mortality_scatter_figure(df_health_data, selected_countries),
         age_mortality_figure(df_health_data, selected_countries),
         summary_text,
-        f'{selected_count} países',
-        f'{total_deaths_text} mortes/milhão',
-        f'{vaccination_text} totalmente vacinados',
+        f'{selected_count} countries',
+        f'{total_deaths_text} deaths/million',
+        f'{vaccination_text} fully vaccinated',
     )
 
 
@@ -218,7 +245,7 @@ app.layout = html.Div(
                     children=[
                         html.Div('CoVID-19 Dashboard', className='dashboard-title'),
                         html.Div(
-                            'Veja como a pandemia de CoVID-19 evoluiu, como afetou o PIB e aspetos demográficos a nível mundial.',
+                            'Explore how the CoVID-19 pandemic evolved over time and how it impacted GDP and other demographic trends across the world. 🌍📊',
                             className='dashboard-subtitle',
                         ),
                     ],
@@ -248,11 +275,11 @@ app.layout = html.Div(
                         html.Div(
                             className='left-panel sidebar-contents',
                             children=[
-                                html.Div('País e Data', className='control-card-title'),
+                                html.Div('Country and Date', className='control-card-title'),
                                 dcc.Dropdown(
                                     id='metric-dropdown',
                                     options=[
-                                        {'label': 'Mortes acumuladas', 'value': 'total_deaths'},
+                                        {'label': 'Total Deaths', 'value': 'total_deaths'},
                                         {'label': 'Case Fatality Ratio (%)', 'value': 'cfr_pct'},
                                     ],
                                     value='total_deaths',
@@ -265,7 +292,7 @@ app.layout = html.Div(
                                     value=default_countries,
                                     multi=True,
                                     clearable=False,
-                                    placeholder='Selecione um ou mais países',
+                                    placeholder='Select one or more countries',
                                     className='country-selector',
                                 ),
                                 dcc.Slider(
@@ -290,7 +317,7 @@ app.layout = html.Div(
                     children=[
                         html.Div(
                             children=[
-                                html.Div('Mapa Global', className='panel-title'),
+                                html.Div('World Map', className='panel-title'),
                                 html.Div(id='selection-summary', className='selection-summary'),
                             ],
                             className='panel-header',
@@ -318,27 +345,27 @@ app.layout = html.Div(
             children=[
                 html.Div(
                     children=[
-                        html.Div('Contexto e indicadores', className='panel-title'),
-                        html.Div('Seleção ativa e resumo da situação.', className='panel-caption'),
+                        html.Div('Context and Indicators', className='panel-title'),
+                        html.Div('Summary of indicators for the selected countries.', className='panel-caption'),
                         html.Div(
                             children=[
                                 html.Div(
                                     children=[
-                                        html.Div('Países selecionados', className='kpi-title'),
+                                        html.Div('Selected Countries', className='kpi-title'),
                                         html.Div(id='selected-count-kpi', className='kpi-value'),
                                     ],
                                     className='kpi-card',
                                 ),
                                 html.Div(
                                     children=[
-                                        html.Div('Mortes médias por milhão', className='kpi-title'),
+                                        html.Div('Average Deaths per Million', className='kpi-title'),
                                         html.Div(id='mortality-kpi', className='kpi-value'),
                                     ],
                                     className='kpi-card',
                                 ),
                                 html.Div(
                                     children=[
-                                        html.Div('Vacinação completa média', className='kpi-title'),
+                                        html.Div('Average Complete Vaccination Rate', className='kpi-title'),
                                         html.Div(id='vaccination-kpi', className='kpi-value'),
                                     ],
                                     className='kpi-card',
@@ -351,7 +378,7 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     children=[
-                        html.Div('Evolução do PIB por país', className='panel-title'),
+                        html.Div('GDP Evolution by Country', className='panel-title'),
                         dcc.Graph(
                             id='gdp-alluvial-graph',
                             figure=gdp_alluvial_figure(allowed_country_names=default_countries),
@@ -363,7 +390,7 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     children=[
-                        html.Div('Evolução pandémica', className='panel-title'),
+                        html.Div('Covid Evolution', className='panel-title'),
                         dcc.Graph(
                             id='covid-evolution-graph',
                             figure=covid_evolution_figure(df_health_data, default_countries),
@@ -375,7 +402,7 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     children=[
-                        html.Div('PIB e resiliência económica', className='panel-title'),
+                        html.Div('GDP and Economic Resilience', className='panel-title'),
                         dcc.Graph(
                             id='gdp-trend-graph',
                             figure=gdp_trend_figure(default_countries),
@@ -387,7 +414,7 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     children=[
-                        html.Div('PIB vs mortalidade', className='panel-title'),
+                        html.Div('GDP vs Mortality', className='panel-title'),
                         dcc.Graph(
                             id='gdp-mortality-scatter-graph',
                             figure=gdp_mortality_scatter_figure(df_health_data, default_countries),
@@ -399,7 +426,7 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     children=[
-                        html.Div('Envelhecimento e mortalidade', className='panel-title'),
+                        html.Div('Ageing and Mortality', className='panel-title'),
                         dcc.Graph(
                             id='age-mortality-graph',
                             figure=age_mortality_figure(df_health_data, default_countries),
@@ -416,8 +443,7 @@ app.layout = html.Div(
     className='dashboard-shell',
 )
 
-app.layout = html.Div(app.layout.children, className='dashboard-page')
-     
+app.layout = html.Div(app.layout.children, className='dashboard-page')     
 
 if __name__ == '__main__':
     app.run(debug=True)
