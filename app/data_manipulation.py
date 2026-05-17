@@ -690,7 +690,7 @@ def gdp_mortality_scatter_figure(df_health: pd.DataFrame, selected_country_names
                 x=x_line,
                 y=y_line,
                 mode='lines',
-                name=f'Trendline (linear) — $R^2$={r2:.2f}',
+                name=f'Trendline: y = {slope:.2f}x + {intercept:.0f}',
                 line=dict(color='rgba(15,23,42,0.9)', dash='dash', width=2),
                 hoverinfo='skip',
             ))
@@ -883,17 +883,6 @@ def age_mortality_figure(df_health: pd.DataFrame, selected_country_names=None):
 
     subtitle = 'Bars: % population 65+; Color: cumulative deaths per million'
     fig = _apply_style_template(fig, title_text='Age structure vs COVID-19 mortality', height=520)
-
-    # Colocar a linha explicativa abaixo do gráfico (em vez do header)
-    fig.add_annotation(
-        text=subtitle,
-        xref='paper', yref='paper',
-        x=0, y=-0.06,
-        showarrow=False,
-        font=dict(size=11, color='#64748b'),
-        xanchor='left',
-        align='left'
-    )
 
     return fig
 

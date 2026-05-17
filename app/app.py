@@ -54,7 +54,7 @@ country_options = [{'label': 'World', 'value': 'World'}] + [
     {'label': location, 'value': location}
     for location in country_values
 ]
-default_countries = ['World']
+default_countries = ['Brazil', 'United States', 'India', 'Russia', 'Portugal', 'South Africa']
 
 MIN_DATE_MS = int(min_date.value // 10**6)
 MAX_DATE_MS = int(max_date.value // 10**6)
@@ -453,6 +453,7 @@ app.layout = html.Div(
                 html.Div(
                     children=[
                         html.Div('How ageing influenced CoVID-19 mortality?', className='panel-title'),
+                        html.Div('Bars: % population 65+; Color: cumulative deaths per million', className='panel-caption'),
                         dcc.Graph(
                             id='age-mortality-graph',
                             figure=age_mortality_figure(df_health_data, default_countries),
