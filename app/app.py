@@ -8,13 +8,13 @@ try:
         FILEPATH,
         build_map_base_data,
         prepare_map_data,
-        generate_date_slider_marks,
-        generate_map_figure,
-        generate_gdp_alluvial_figure,
-        generate_covid_evolution_figure,
-        generate_gdp_trend_figure,
-        generate_gdp_mortality_scatter_figure,
-        generate_age_mortality_figure,
+        date_slider_marks,
+        map_figure,
+        gdp_alluvial_figure,
+        covid_evolution_figure,
+        gdp_trend_figure,
+        gdp_mortality_scatter_figure,
+        age_mortality_figure,
     )
 except ImportError:
     from data_manipulation import (
@@ -22,13 +22,13 @@ except ImportError:
         FILEPATH,
         build_map_base_data,
         prepare_map_data,
-        generate_date_slider_marks,
-        generate_map_figure,
-        generate_gdp_alluvial_figure,
-        generate_covid_evolution_figure,
-        generate_gdp_trend_figure,
-        generate_gdp_mortality_scatter_figure,
-        generate_age_mortality_figure,
+        date_slider_marks,
+        map_figure,
+        gdp_alluvial_figure,
+        covid_evolution_figure,
+        gdp_trend_figure,
+        gdp_mortality_scatter_figure,
+        age_mortality_figure,
     )
 
 app = dash.Dash(__name__)
@@ -41,7 +41,7 @@ if df_health is None:
 assert df_health is not None
 df_health_data: pd.DataFrame = df_health
 
-date_marks = generate_date_slider_marks(df_health, num_marks=3)
+date_marks = date_slider_marks(df_health, num_marks=3)
 df_map_base = build_map_base_data(df_health)
 min_date = df_health['date'].min()
 max_date = df_health['date'].max()
@@ -242,25 +242,25 @@ def update_dashboard_views(selected_countries, end_date_value, metric_value):
 
     summary_text = html.Div(
         children=[
-            html.Span('Seleção ativa: ', className='selection-summary-label'),
+            html.Span('Active Selection: ', className='selection-summary-label'),
             html.Span(', '.join(selected_countries[:4]), className='selection-summary-countries'),
             html.Span('' if len(selected_countries) <= 4 else f' +{len(selected_countries) - 4}', className='selection-summary-more'),
         ]
     )
 
-    selected_count_text = 'Mundo' if selected_countries == ['World'] else f'{selected_count} países'
+    selected_count_text = 'World' if selected_countries == ['World'] else f'{selected_count} countries'
 
     return (
-        generate_map_figure(df_map, end_date, metric=metric_value, color_max=color_max, selected_country_names=map_selected_countries),
-        generate_gdp_alluvial_figure(allowed_country_names=world_only_selection),
-        generate_covid_evolution_figure(df_health_data, world_only_selection),
-        generate_gdp_trend_figure(world_only_selection),
-        generate_gdp_mortality_scatter_figure(df_health_data, world_only_selection),
-        generate_age_mortality_figure(df_health_data, world_only_selection),
+        map_figure(df_map, end_date, metric=metric_value, color_max=color_max, selected_country_names=map_selected_countries),
+        gdp_alluvial_figure(allowed_country_names=world_only_selection),
+        covid_evolution_figure(df_health_data, world_only_selection),
+        gdp_trend_figure(world_only_selection),
+        gdp_mortality_scatter_figure(df_health_data, world_only_selection),
+        age_mortality_figure(df_health_data, world_only_selection),
         summary_text,
-        f'{selected_count} países',
-        f'{total_deaths_text} mortes/milhão',
-        f'{vaccination_text} totalmente vacinados',
+        f'{selected_count} countries',
+        f'{total_deaths_text} deaths/million',
+        f'{vaccination_text} fully vaccinated',
     )
 
 
@@ -271,9 +271,9 @@ app.layout = html.Div(
             children=[
                 html.Div(
                     children=[
-                        html.Div('CoVID-19 Dashboard', className='dashboard-title'),
+                        html.Div('The Pandemic Lens', className='dashboard-title'),
                         html.Div(
-                            'Explore how the CoVID-19 pandemic evolved over time and how it impacted GDP and other demographic trends across the world. 🌍📊',
+                            'Health, economy and demographic trends during the CoVID-19 pandemic 🌍📊',
                             className='dashboard-subtitle',
                         ),
                     ],
@@ -353,14 +353,14 @@ app.layout = html.Div(
                     children=[
                         html.Div(
                             children=[
-                                html.Div('World Map', className='panel-title'),
+                                html.Div('Tracking human fatalities', className='panel-title'),
                                 html.Div(id='selection-summary', className='selection-summary'),
                             ],
                             className='panel-header',
                         ),
                         dcc.Graph(
                             id='map-graph',
-                            figure=generate_map_figure(
+                            figure=map_figure(
                                 prepare_map_data(df_map_base, default_date, preprocessed=True),
                                 default_date,
                                 metric='total_deaths',
@@ -414,10 +414,10 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     children=[
-                        html.Div('GDP Evolution by Country', className='panel-title'),
+                        html.Div('Economic Disruption during the Pandemic', className='panel-title'),
                         dcc.Graph(
                             id='gdp-alluvial-graph',
-                            figure=generate_gdp_alluvial_figure(allowed_country_names=default_countries),
+                            figure=gdp_alluvial_figure(allowed_country_names=default_countries),
                             className='report-graph',
                             config={'displayModeBar': False, 'responsive': True},
                         ),
@@ -426,10 +426,10 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     children=[
-                        html.Div('Covid Evolution', className='panel-title'),
+                        html.Div('The Progression of the Pandemic', className='panel-title'),
                         dcc.Graph(
                             id='covid-evolution-graph',
-                            figure=generate_covid_evolution_figure(df_health_data, default_countries),
+                            figure=covid_evolution_figure(df_health_data, default_countries),
                             className='report-graph',
                             config={'displayModeBar': False, 'responsive': True},
                         ),
@@ -438,10 +438,10 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     children=[
-                        html.Div('GDP and Economic Resilience', className='panel-title'),
+                        html.Div('Economic Performance under Pandemic Pressure', className='panel-title'),
                         dcc.Graph(
                             id='gdp-trend-graph',
-                            figure=generate_gdp_trend_figure(default_countries),
+                            figure=gdp_trend_figure(default_countries),
                             className='report-graph',
                             config={'displayModeBar': False, 'responsive': True},
                         ),
@@ -450,10 +450,10 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     children=[
-                        html.Div('GDP vs Mortality', className='panel-title'),
+                        html.Div('Did stronger economies experience lower mortality?', className='panel-title'),
                         dcc.Graph(
                             id='gdp-mortality-scatter-graph',
-                            figure=generate_gdp_mortality_scatter_figure(df_health_data, default_countries),
+                            figure=gdp_mortality_scatter_figure(df_health_data, default_countries),
                             className='report-graph',
                             config={'displayModeBar': False, 'responsive': True},
                         ),
@@ -462,10 +462,10 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     children=[
-                        html.Div('Ageing and Mortality', className='panel-title'),
+                        html.Div('How ageing influenced CoVID-19 mortality?', className='panel-title'),
                         dcc.Graph(
                             id='age-mortality-graph',
-                            figure=generate_age_mortality_figure(df_health_data, default_countries),
+                            figure=age_mortality_figure(df_health_data, default_countries),
                             className='report-graph',
                             config={'displayModeBar': False, 'responsive': True},
                         ),

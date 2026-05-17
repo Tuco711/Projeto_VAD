@@ -19,7 +19,7 @@ COLOR_PALETTE = {
 }
 
 # Definir fonte padrão para toda a aplicação
-FONT_FAMILY = 'Segoe UI, Roboto, Helvetica, Arial, sans-serif'
+FONT_FAMILY = 'Inter, Segoe UI, Roboto, Helvetica, Arial, sans-serif'
 
 FILEPATH = Path('.\\datasets\\owid-covid-data.csv')
 GDP_FILEPATH = Path('.\\datasets\\GDP_data.csv')
@@ -28,15 +28,41 @@ GDP_FILEPATH = Path('.\\datasets\\GDP_data.csv')
 def _apply_style_template(fig, title_text=None, subtitle_text=None, height=450):
     """Aplica estilo consistente a todos os gráficos"""
     fig.update_layout(
-        template='plotly_white',
-        height=height,
-        margin=dict(t=80 if subtitle_text else 70, l=30, r=20, b=30),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(family=FONT_FAMILY, size=11, color=COLOR_PALETTE['neutral_dark']),
-        hovermode='x unified',
-        uirevision='country-selection',
-    )
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+
+    font=dict(
+        family="Inter",
+        size=14,
+        color="#0f172a"
+    ),
+
+    title_font=dict(
+        size=22,
+        color="#0f172a"
+    ),
+
+    margin=dict(
+        l=30,
+        r=20,
+        t=70,
+        b=30
+    ),
+
+    transition_duration=400
+)
+
+    fig.update_xaxes(
+        gridcolor="rgba(15,23,42,0.05)",
+        zeroline=False,
+        showline=False
+)
+
+    fig.update_yaxes(
+        gridcolor="rgba(15,23,42,0.05)",
+        zeroline=False,
+        showline=False
+)
     
     # Adicionar título e subtítulo se fornecidos
     if title_text or subtitle_text:
@@ -77,7 +103,7 @@ def _extract_gdp_year_columns(df_gdp: pd.DataFrame) -> dict:
     return dict(sorted(year_columns.items()))
 
 
-def generate_gdp_alluvial_figure(filepath: Path = GDP_FILEPATH, top_n: int = 12, allowed_country_names=None):
+def gdp_alluvial_figure(filepath: Path = GDP_FILEPATH, top_n: int = 12, allowed_country_names=None):
     df_gdp = pd.read_csv(filepath)
     year_columns = _extract_gdp_year_columns(df_gdp)
 
@@ -210,9 +236,9 @@ def generate_gdp_alluvial_figure(filepath: Path = GDP_FILEPATH, top_n: int = 12,
     )
 
     layout_height = 520
-    margin_top = 58
+    margin_top = 90
     margin_bottom = 8
-    year_label_y = 1.02
+    year_label_y = 1.06
 
     fig.update_layout(
         title=None,
@@ -228,7 +254,7 @@ def generate_gdp_alluvial_figure(filepath: Path = GDP_FILEPATH, top_n: int = 12,
         ],
     )
 
-    return fig
+    return _apply_style_template(fig, height=layout_height)
 
 
 def _resolve_country_selection(df_health: pd.DataFrame, selected_country_names=None, top_n: int = 6) -> list[str]:
@@ -306,7 +332,7 @@ def _prepare_covid_metrics(df_health: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def generate_covid_evolution_figure(df_health: pd.DataFrame, selected_country_names=None):
+def covid_evolution_figure(df_health: pd.DataFrame, selected_country_names=None):
     df = _prepare_covid_metrics(df_health)
     selected_country_names = _resolve_country_selection(df, selected_country_names, top_n=6)
     selected_country_names = _collapse_to_world_when_all_countries_selected(df, selected_country_names)
@@ -324,9 +350,9 @@ def generate_covid_evolution_figure(df_health: pd.DataFrame, selected_country_na
     df_plot['month'] = df_plot['date'].dt.to_period('M').dt.to_timestamp()
 
     metric_specs = [
-        ('new_cases_smoothed_per_million', 'Incidência de Casos', 'Número de novos casos confirmados por milhão de habitantes, suavizados em 7 dias', COLOR_PALETTE['primary']),
-        ('new_deaths_smoothed_per_million', 'Mortalidade Atribuída', 'Número de mortes por COVID-19 por milhão de habitantes, suavizadas em 7 dias', COLOR_PALETTE['secondary']),
-        ('people_fully_vaccinated_per_hundred', 'Cobertura de Vacinação', 'Percentual da população que completou o esquema primário de vacinação', COLOR_PALETTE['accent']),
+        ('new_cases_smoothed_per_million', 'Incidence of Cases', 'Number of new confirmed cases per million inhabitants, smoothed over 7 days', COLOR_PALETTE['primary']),
+        ('new_deaths_smoothed_per_million', 'Attributable Mortality', 'Number of deaths from COVID-19 per million inhabitants, smoothed over 7 days', COLOR_PALETTE['secondary']),
+        ('people_fully_vaccinated_per_hundred', 'Vaccination Coverage', 'Percentage of the population that has completed the primary vaccination scheme', COLOR_PALETTE['accent']),
     ]
 
     fig = make_subplots(
@@ -351,6 +377,12 @@ def generate_covid_evolution_figure(df_health: pd.DataFrame, selected_country_na
         grouped = country_df.groupby('month', as_index=False)[[spec[0] for spec in metric_specs]].mean(numeric_only=True)
 
         for row_index, (metric_column, metric_name, metric_desc, _) in enumerate(metric_specs, start=1):
+            # Use percent-friendly hover for vaccination metric (values are in percent points)
+            if metric_column == 'people_fully_vaccinated_per_hundred':
+                hover_tmpl = f'<b>{country}</b><br>%{{x|%b %Y}}<br>%{{y:,.1f}}%<extra></extra>'
+            else:
+                hover_tmpl = f'<b>{country}</b><br>%{{x|%b %Y}}<br>%{{y:,.2f}}<extra></extra>'
+
             fig.add_trace(
                 go.Scatter(
                     x=grouped['month'],
@@ -360,7 +392,7 @@ def generate_covid_evolution_figure(df_health: pd.DataFrame, selected_country_na
                     legendgroup=country,
                     showlegend=(row_index == 1),
                     line=dict(color=color_map[country], width=2.5),
-                    hovertemplate=f'<b>{country}</b><br>%{{x|%b %Y}}<br>%{{y:,.2f}}<extra></extra>',
+                    hovertemplate=hover_tmpl,
                 ),
                 row=row_index,
                 col=1,
@@ -389,9 +421,10 @@ def generate_covid_evolution_figure(df_health: pd.DataFrame, selected_country_na
     )
     
     # Atualizar eixos Y com melhor formatação
-    fig.update_yaxes(title_text='Casos/1M', row=1, col=1, tickformat=',d')
-    fig.update_yaxes(title_text='Óbitos/1M', row=2, col=1, tickformat=',d')
-    fig.update_yaxes(title_text='Cobertura %', row=3, col=1, tickformat='.1%')
+    fig.update_yaxes(title_text='Cases/1M', row=1, col=1, tickformat=',d')
+    fig.update_yaxes(title_text='Deaths/1M', row=2, col=1, tickformat=',d')
+    # Vaccination values are stored as percent points (0-100), format axis accordingly
+    fig.update_yaxes(title_text='Vaccination Coverage %', row=3, col=1, tickformat=',.1f', ticksuffix='%')
     fig.update_xaxes(title_text='', row=3, col=1)
     
     # Adicionar descrições das métricas como anotações
@@ -407,10 +440,10 @@ def generate_covid_evolution_figure(df_health: pd.DataFrame, selected_country_na
             align='left'
         )
 
-    return fig
+    return _apply_style_template(fig, height=720)
 
 
-def generate_gdp_trend_figure(selected_country_names=None, filepath: Path = GDP_FILEPATH):
+def gdp_trend_figure(selected_country_names=None, filepath: Path = GDP_FILEPATH):
     df_gdp = pd.read_csv(filepath)
     year_columns = _extract_gdp_year_columns(df_gdp)
     selected_years = [year for year in range(2019, 2025) if year in year_columns]
@@ -445,7 +478,7 @@ def generate_gdp_trend_figure(selected_country_names=None, filepath: Path = GDP_
         '#1e40af', '#dc2626', '#0d9488', '#ea580c', '#7c3aed', '#0891b2'
     ]
     color_map = {country: country_colors[i % len(country_colors)] 
-                 for i, country in enumerate(df_long['Country Name'].unique())}
+                for i, country in enumerate(df_long['Country Name'].unique())}
     
     fig = go.Figure()
     
@@ -458,7 +491,7 @@ def generate_gdp_trend_figure(selected_country_names=None, filepath: Path = GDP_
             name=country,
             line=dict(color=color_map[country], width=3),
             marker=dict(size=8, symbol='circle'),
-            hovertemplate='<b>%{fullData.name}</b><br>%{x}<br>PIB: $%{y:,.0f}<extra></extra>',
+            hovertemplate='<b>%{fullData.name}</b><br>%{x}<br>GDP: $%{y:.2s}<extra></extra>',
         ))
 
     fig.update_layout(
@@ -480,11 +513,11 @@ def generate_gdp_trend_figure(selected_country_names=None, filepath: Path = GDP_
             bordercolor='rgba(200, 200, 200, 0.3)',
             borderwidth=1
         ),
-        xaxis=dict(title='Ano', showgrid=True, gridwidth=1, gridcolor='rgba(0,0,0,0.1)'),
-        yaxis=dict(title='PIB (USD correntes)', tickformat=',.0f', showgrid=True, gridwidth=1, gridcolor='rgba(0,0,0,0.1)'),
+        xaxis=dict(title='Year', showgrid=True, gridwidth=1, gridcolor='rgba(15,23,42,0.06)'),
+        yaxis=dict(title='GDP (USD current)', tickformat='.2s', tickprefix='$', showgrid=True, gridwidth=1, gridcolor='rgba(15,23,42,0.06)'),
     )
 
-    return fig
+    return _apply_style_template(fig)
 
 
 def _compute_padding_for_marker_size(max_size_value, sizeref, x_data_range, y_data_range):
@@ -515,7 +548,7 @@ def _compute_padding_for_marker_size(max_size_value, sizeref, x_data_range, y_da
     return padding_x, padding_y
 
 
-def generate_gdp_mortality_scatter_figure(df_health: pd.DataFrame, selected_country_names=None, filepath: Path = GDP_FILEPATH):
+def gdp_mortality_scatter_figure(df_health: pd.DataFrame, selected_country_names=None, filepath: Path = GDP_FILEPATH):
     df = _prepare_covid_metrics(df_health)
     selected_country_names = _resolve_country_selection(df, selected_country_names, top_n=8)
 
@@ -570,37 +603,99 @@ def generate_gdp_mortality_scatter_figure(df_health: pd.DataFrame, selected_coun
         sizeref_gdp = 1
 
     # Criar colormap por continente
+    # Criar colormap por continente (separar Americas em North/South por heurística)
     continent_colors = {
         'Africa': '#ef4444',
-        'Americas': '#3b82f6',
+        'North America': '#3b82f6',
+        'South America': '#06b6d4',
         'Asia': '#10b981',
         'Europe': '#f59e0b',
-        'Oceania': '#8b5cf6'
-        , 'World': COLOR_PALETTE['primary']
+        'Oceania': '#8b5cf6',
+        'World': COLOR_PALETTE['primary']
     }
-    df_merged['color'] = df_merged['continent'].map(continent_colors) if 'continent' in df_merged.columns else COLOR_PALETTE['primary']
 
+    # Heurística simples para separar países da América do Sul
+    SOUTH_AMERICA = {
+        'Argentina', 'Bolivia', 'Brazil', 'Chile', 'Colombia', 'Ecuador', 'Guyana', 'Paraguay',
+        'Peru', 'Suriname', 'Uruguay', 'Venezuela', 'French Guiana'
+    }
+
+    # Criar coluna de exibição de continente onde 'Americas' é subdividido
+    if 'continent' in df_merged.columns and 'location' in df_merged.columns:
+        df_merged['continent_display'] = df_merged['continent']
+        mask_amer = df_merged['continent_display'] == 'Americas'
+        if mask_amer.any():
+            df_merged.loc[mask_amer, 'continent_display'] = df_merged.loc[mask_amer, 'location'].apply(
+                lambda loc: 'South America' if any(s in str(loc) for s in SOUTH_AMERICA) else 'North America'
+            )
+    else:
+        df_merged['continent_display'] = df_merged.get('continent', COLOR_PALETTE['primary'])
+
+    # Prepare marker sizing (scale population to a reasonable pixel range)
     fig = go.Figure()
-    
-    for continent in (df_merged['continent'].unique() if 'continent' in df_merged.columns else [None]):
-        df_continent = df_merged[df_merged['continent'] == continent] if continent else df_merged
-        
+
+    pop_mill = (df_merged['population'] / 1_000_000) if 'population' in df_merged.columns else pd.Series(dtype=float)
+    if not pop_mill.empty:
+        pop_min = pop_mill.min()
+        pop_max = pop_mill.max()
+        # map to range 8-40
+        def scale_size(v):
+            if pop_max == pop_min:
+                return 16
+            return 8 + ( (v - pop_min) / (pop_max - pop_min) ) * (40 - 8)
+        df_merged['_marker_size'] = pop_mill.apply(scale_size)
+    else:
+        df_merged['_marker_size'] = 12
+
+    # Add continent/grouped points with improved hover and sizing
+    for continent in (df_merged['continent_display'].unique() if 'continent_display' in df_merged.columns else [None]):
+        df_continent = df_merged[df_merged['continent_display'] == continent] if continent is not None else df_merged
+
         fig.add_trace(go.Scatter(
             x=df_continent['gdp_growth_pct'],
             y=df_continent['total_deaths_per_million'],
             mode='markers',
-            name=continent or 'Dados',
+            name=continent or 'Data',
             marker=dict(
-                size=(size_values_gdp.loc[df_continent.index].values if 'population' in df_continent.columns else 10),
+                size=df_continent['_marker_size'],
                 color=continent_colors.get(continent, COLOR_PALETTE['primary']) if continent else COLOR_PALETTE['primary'],
                 sizemode='diameter',
-                sizeref=sizeref_gdp,
-                line=dict(color='white', width=1.5),
-                opacity=0.75
+                line=dict(color='white', width=1.2),
+                opacity=0.85
             ),
             text=df_continent['location'],
-            hovertemplate='<b>%{text}</b><br>PIB crescimento: %{x:.1f}%<br>Mortes: %{y:,.0f}/1M<extra></extra>',
+            hovertemplate='<b>%{text}</b><br>GDP Growth: %{x:.1f}%<br>Deaths: %{y:,.0f} per 1M<br>Population: %{customdata:,}<extra></extra>',
+            customdata=(df_continent['population'] if 'population' in df_continent.columns else None),
         ))
+
+    # Add linear trendline across all points (if enough data)
+    try:
+        x_all = df_merged['gdp_growth_pct'].to_numpy(dtype=float)
+        y_all = df_merged['total_deaths_per_million'].to_numpy(dtype=float)
+        if x_all.size >= 2 and np.isfinite(x_all).sum() >= 2 and np.isfinite(y_all).sum() >= 2:
+            mask = np.isfinite(x_all) & np.isfinite(y_all)
+            x_fit = x_all[mask]
+            y_fit = y_all[mask]
+            coef = np.polyfit(x_fit, y_fit, 1)
+            slope, intercept = coef[0], coef[1]
+            x_line = np.linspace(x_fit.min(), x_fit.max(), 100)
+            y_line = slope * x_line + intercept
+            # Calculate R^2
+            y_pred = slope * x_fit + intercept
+            ss_res = np.sum((y_fit - y_pred) ** 2)
+            ss_tot = np.sum((y_fit - np.mean(y_fit)) ** 2)
+            r2 = 1 - ss_res / ss_tot if ss_tot > 0 else np.nan
+
+            fig.add_trace(go.Scatter(
+                x=x_line,
+                y=y_line,
+                mode='lines',
+                name=f'Trendline (linear) — $R^2$={r2:.2f}',
+                line=dict(color='rgba(15,23,42,0.9)', dash='dash', width=2),
+                hoverinfo='skip',
+            ))
+    except Exception:
+        pass
 
     # Compute padding based on largest marker size to ensure proper zoom (only if data exists)
     layout_update = dict(
@@ -613,18 +708,18 @@ def generate_gdp_mortality_scatter_figure(df_health: pd.DataFrame, selected_coun
         hovermode='closest',
         uirevision='country-selection',
         xaxis=dict(
-            title='Crescimento do PIB 2019-2024 (%)',
+            title='GDP Growth 2019-2024 (%)',
             zeroline=True,
             zerolinecolor='rgba(100, 100, 100, 0.2)',
             showgrid=True,
             gridwidth=1,
-            gridcolor='rgba(0,0,0,0.1)'
+            gridcolor='rgba(15,23,42,0.06)'
         ),
         yaxis=dict(
-            title='Mortes acumuladas por milhão',
+            title='Cumulative Deaths per Million',
             showgrid=True,
             gridwidth=1,
-            gridcolor='rgba(0,0,0,0.1)'
+            gridcolor='rgba(15,23,42,0.06)'
         ),
         legend=dict(
             orientation='v',
@@ -637,51 +732,16 @@ def generate_gdp_mortality_scatter_figure(df_health: pd.DataFrame, selected_coun
             borderwidth=1
         )
     )
-    
-    fig.update_layout(**layout_update)
-    
-    # Apply proportional zoom only if data exists
-    if not df_merged.empty:
-        x_range = df_merged['gdp_growth_pct'].max() - df_merged['gdp_growth_pct'].min()
-        y_range = df_merged['total_deaths_per_million'].max() - df_merged['total_deaths_per_million'].min()
-        
-        # For single data point, provide reasonable padding instead of zero range
-        if x_range == 0:
-            x_center = df_merged['gdp_growth_pct'].iloc[0]
-            x_range = 10  # Default range of ±5% for single point
-        if y_range == 0:
-            y_center = df_merged['total_deaths_per_million'].iloc[0]
-            y_range = 500  # Default range of ±250 deaths/1M for single point
-        
-        pad_x, pad_y = _compute_padding_for_marker_size(capped_max, sizeref_gdp, x_range, y_range)
-        x_min = df_merged['gdp_growth_pct'].min() - pad_x
-        x_max = df_merged['gdp_growth_pct'].max() + pad_x
-        y_min = df_merged['total_deaths_per_million'].min() - pad_y
-        y_max = df_merged['total_deaths_per_million'].max() + pad_y
-        
-        # For single point, ensure minimum spacing
-        if df_merged.shape[0] == 1:
-            x_center = df_merged['gdp_growth_pct'].iloc[0]
-            y_center = df_merged['total_deaths_per_million'].iloc[0]
-            # Create symmetric range around the single point
-            x_span = max(abs(x_center * 0.2), 5) if x_center != 0 else 5
-            y_span = max(abs(y_center * 0.2), 250) if y_center != 0 else 250
-            x_min = x_center - x_span
-            x_max = x_center + x_span
-            y_min = y_center - y_span
-            y_max = y_center + y_span
-        
-        fig.update_layout(
-            xaxis=dict(range=[x_min, x_max]),
-            yaxis=dict(range=[y_min, y_max])
-        )
 
-    return fig
+    return _apply_style_template(fig)
 
 
-def generate_age_mortality_figure(df_health: pd.DataFrame, selected_country_names=None):
+def age_mortality_figure(df_health: pd.DataFrame, selected_country_names=None):
+    # Substitui o scatter por um gráfico de barras horizontais claro e comparável:
+    # barras representam a percentagem da população com 65+ anos (`aged_65_older`) e
+    # a cor da barra representa a mortalidade acumulada (`total_deaths_per_million`).
     df = _prepare_covid_metrics(df_health)
-    selected_country_names = _resolve_country_selection(df, selected_country_names, top_n=8)
+    selected_country_names = _resolve_country_selection(df, selected_country_names, top_n=10)
 
     required_columns = ['location', 'continent', 'median_age', 'aged_65_older', 'total_deaths_per_million', 'gdp_per_capita']
     available_columns = [column for column in required_columns if column in df.columns]
@@ -772,72 +832,68 @@ def generate_age_mortality_figure(df_health: pd.DataFrame, selected_country_name
         ))
 
     # Compute padding based on largest marker size to ensure proper zoom (only if data exists)
+    df_latest = df_latest[df_latest['location'].isin(selected_country_names)].dropna(subset=['aged_65_older'])
+
+    if df_latest.empty:
+        fig = go.Figure()
+        fig.update_layout(title='No data available for selected countries')
+        return _apply_style_template(fig)
+
+    # Ordenar por percentagem de 65+ para facilitar leitura
+    df_latest['aged_65_older'] = pd.to_numeric(df_latest['aged_65_older'], errors='coerce')
+    df_latest['total_deaths_per_million'] = pd.to_numeric(df_latest.get('total_deaths_per_million', pd.Series(dtype=float)), errors='coerce')
+    df_plot = df_latest.sort_values('aged_65_older', ascending=True)
+
+    # Usar a mesma combinação de cores do gráfico de `vaccination_comparison_figure`:
+    # `accent` para valores baixos -> `secondary` para valores altos
+    colorscale = [[0, COLOR_PALETTE['accent']], [1, COLOR_PALETTE['secondary']]]
+    marker_colors = df_plot['total_deaths_per_million']
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=df_plot['aged_65_older'],
+        y=df_plot['location'],
+        orientation='h',
+        marker=dict(
+            color=marker_colors,
+            colorscale=colorscale,
+            showscale=True,
+            colorbar=dict(title='Deaths/1M', thickness=12, x=1.02)
+        ),
+        hovertemplate='<b>%{y}</b><br>Share 65+: %{x:.1f}%<br>Median age: %{customdata[0]:.1f}<br>Deaths: %{customdata[1]:,.0f}/1M<extra></extra>',
+        customdata=np.stack([
+            df_plot.get('median_age', pd.Series([np.nan]*len(df_plot))).to_numpy(),
+            df_plot.get('total_deaths_per_million', pd.Series([np.nan]*len(df_plot))).to_numpy(),
+        ], axis=-1),
+    ))
+
+    # Aumentar margem inferior para espaço do texto explicativo abaixo do gráfico
     fig.update_layout(
         template='plotly_white',
-        height=450,
-        margin=dict(t=80, l=50, r=20, b=30),
+        height=520,
+        margin=dict(t=80, l=160, r=60, b=90),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         font=dict(family=FONT_FAMILY, size=11, color=COLOR_PALETTE['neutral_dark']),
-        hovermode='closest',
-        uirevision='country-selection',
-        xaxis=dict(
-            title='Idade mediana (anos)',
-            showgrid=True,
-            gridwidth=1,
-            gridcolor='rgba(0,0,0,0.1)'
-        ),
-        yaxis=dict(
-            title='Mortes acumuladas por milhão',
-            showgrid=True,
-            gridwidth=1,
-            gridcolor='rgba(0,0,0,0.1)'
-        ),
-        legend=dict(
-            orientation='v',
-            yanchor='top',
-            y=0.99,
-            xanchor='right',
-            x=0.99,
-            bgcolor='rgba(255,255,255,0.7)',
-            bordercolor='rgba(200, 200, 200, 0.3)',
-            borderwidth=1
-        )
+        xaxis=dict(title='Share of population aged 65+ (%)', showgrid=True, gridcolor='rgba(15,23,42,0.06)'),
+        yaxis=dict(title='', automargin=True),
+        hovermode='y',
+        uirevision='country-selection'
     )
-    
-    # Apply proportional zoom only if data exists
-    if not df_latest.empty:
-        x_range_age = df_latest['median_age'].max() - df_latest['median_age'].min()
-        y_range_age = df_latest['total_deaths_per_million'].max() - df_latest['total_deaths_per_million'].min()
-        
-        # For single data point, provide reasonable padding instead of zero range
-        if x_range_age == 0:
-            x_range_age = 10  # Default range of ±5 years for single point
-        if y_range_age == 0:
-            y_range_age = 500  # Default range of ±250 deaths/1M for single point
-        
-        pad_x_age, pad_y_age = _compute_padding_for_marker_size(capped_max_age, sizeref, x_range_age, y_range_age)
-        x_min_age = df_latest['median_age'].min() - pad_x_age
-        x_max_age = df_latest['median_age'].max() + pad_x_age
-        y_min_age = df_latest['total_deaths_per_million'].min() - pad_y_age
-        y_max_age = df_latest['total_deaths_per_million'].max() + pad_y_age
-        
-        # For single point, ensure minimum spacing
-        if df_latest.shape[0] == 1:
-            x_center = df_latest['median_age'].iloc[0]
-            y_center = df_latest['total_deaths_per_million'].iloc[0]
-            # Create symmetric range around the single point
-            x_span = max(abs(x_center * 0.2), 5) if x_center != 0 else 5
-            y_span = max(abs(y_center * 0.2), 250) if y_center != 0 else 250
-            x_min_age = x_center - x_span
-            x_max_age = x_center + x_span
-            y_min_age = y_center - y_span
-            y_max_age = y_center + y_span
-        
-        fig.update_layout(
-            xaxis=dict(range=[x_min_age, x_max_age]),
-            yaxis=dict(range=[y_min_age, y_max_age])
-        )
+
+    subtitle = 'Bars: % population 65+; Color: cumulative deaths per million'
+    fig = _apply_style_template(fig, title_text='Age structure vs COVID-19 mortality', height=520)
+
+    # Colocar a linha explicativa abaixo do gráfico (em vez do header)
+    fig.add_annotation(
+        text=subtitle,
+        xref='paper', yref='paper',
+        x=0, y=-0.06,
+        showarrow=False,
+        font=dict(size=11, color='#64748b'),
+        xanchor='left',
+        align='left'
+    )
 
     return fig
 
@@ -900,7 +956,7 @@ def load_health_covid_data(filepath: Path) -> pd.DataFrame | None:
     else:
         return None
 
-def generate_date_slider_marks(df_health: pd.DataFrame, num_marks: int = 6) -> dict:
+def date_slider_marks(df_health: pd.DataFrame, num_marks: int = 6) -> dict:
     date_series = pd.to_datetime(df_health['date']).dropna()
     if date_series.empty:
         return {}
@@ -954,50 +1010,50 @@ def prepare_map_data(df_health: pd.DataFrame, end_date=None, preprocessed: bool 
 
     return df_map
 
-def generate_map_metadata(metric: str = 'cfr_pct') -> dict:
+def map_metadata(metric: str = 'cfr_pct') -> dict:
     if metric == 'cfr_pct':
         return {
-            'title': 'Taxa de Letalidade (CFR) - % de óbitos entre casos confirmados',
+            'title': 'Case Fatality Rate(CFR) - % of deaths among confirmed cases',
             'color_scale': 'Reds',
             'color_label': 'CFR (%)'
         }
     elif metric == 'total_cases':
         return {
-            'title': 'Casos Confirmados Cumulativos - Total de infecções registadas',
+            'title': 'Cumulative Confirmed Cases - Total of infections recorded',
             'color_scale': 'Blues',
             'color_label': 'Total Cases'
         }
     elif metric == 'total_deaths':
         return {
-            'title': 'Óbitos Cumulativos por COVID-19 - Mortes confirmadas',
+            'title': 'Cumulative Deaths from COVID-19 - Confirmed deaths',
             'color_scale': 'OrRd',
-            'color_label': 'Mortes acumuladas'
+            'color_label': 'Cumulative Deaths'
         }
     else:
         return {
-            'title': 'Mapa Mundial - Métrica Desconecida',
+            'title': 'World Map - Unknown Metric',
             'color_scale': 'Greys',
             'color_label': metric
         }
 
-def generate_map_figure(df_map: pd.DataFrame, end_date=None, metric='total_deaths', color_max=None, selected_country_names=None):
+def map_figure(df_map: pd.DataFrame, end_date=None, metric='total_deaths', color_max=None, selected_country_names=None):
     metric = metric or 'total_deaths'
-    metadata = generate_map_metadata(metric)
+    metadata = map_metadata(metric)
     if end_date is not None:
         end_date = pd.to_datetime(end_date)
         if metric == 'cfr_pct':
-            title = f"Mapa Mundial - CFR (%) até {end_date.strftime('%d/%m/%Y')}"
+            title = f"World Map - CFR (%) until {end_date.strftime('%d/%m/%Y')}"
         elif metric == 'total_cases':
-            title = f"Mapa Mundial - Total de Casos até {end_date.strftime('%d/%m/%Y')}"
+            title = f"World Map - Total Cases until {end_date.strftime('%d/%m/%Y')}"
         else:
-            title = f"Mapa Mundial - Mortes Acumuladas até {end_date.strftime('%d/%m/%Y')}"
+            title = f"World Map - Deaths until {end_date.strftime('%d/%m/%Y')}"
     else:
         if metric == 'cfr_pct':
-            title = 'Mapa Mundial - CFR (%)'
+            title = 'World Map - CFR (%)'
         elif metric == 'total_cases':
-            title = 'Mapa Mundial - Total de Casos'
+            title = 'World Map - Total Cases'
         else:
-            title = 'Mapa Mundial - Mortes Acumuladas'
+            title = 'World Map - Deaths'
 
     if color_max is None:
         color_max = df_map[metric].max()
@@ -1035,7 +1091,7 @@ def generate_map_figure(df_map: pd.DataFrame, end_date=None, metric='total_death
                     showscale=False,
                     marker_line_color='rgba(148, 163, 184, 0.25)',
                     marker_line_width=0.2,
-                    hovertemplate='<b>%{text}</b><br>Data: %{customdata[0]}<br>Casos totais: %{customdata[1]:,.0f}<br>Mortes totais: %{customdata[2]:,.0f}<br>CFR: %{customdata[3]:.2f}%<extra></extra>',
+                    hovertemplate='<b>%{text}</b><br>Data: %{customdata[0]}<br>Total Cases: %{customdata[1]:,.0f}<br>Total Deaths: %{customdata[2]:,.0f}<br>CFR: %{customdata[3]:.2f}%<extra></extra>',
                 )
             )
         fig.add_trace(
@@ -1058,7 +1114,7 @@ def generate_map_figure(df_map: pd.DataFrame, end_date=None, metric='total_death
                 ),
                 marker_line_color='rgba(15, 23, 42, 0.55)',
                 marker_line_width=0.8,
-                hovertemplate='<b>%{text}</b><br>Data: %{customdata[0]}<br>Casos totais: %{customdata[1]:,.0f}<br>Mortes totais: %{customdata[2]:,.0f}<br>CFR: %{customdata[3]:.2f}%<extra></extra>',
+                hovertemplate='<b>%{text}</b><br>Data: %{customdata[0]}<br>Total Cases: %{customdata[1]:,.0f}<br>Total Deaths: %{customdata[2]:,.0f}<br>CFR: %{customdata[3]:.2f}%<extra></extra>',
             )
         )
     else:
@@ -1077,17 +1133,17 @@ def generate_map_figure(df_map: pd.DataFrame, end_date=None, metric='total_death
     if metric == 'cfr_pct':
         hover_template = (
             '<b>%{hovertext}</b><br>'
-            'Data: %{customdata[0]}<br>'
-            'Casos totais: %{customdata[1]:,.0f}<br>'
-            'Mortes totais: %{customdata[2]:,.0f}<br>'
+            'Date: %{customdata[0]}<br>'
+            'Total Cases: %{customdata[1]:,.0f}<br>'
+            'Total Deaths: %{customdata[2]:,.0f}<br>'
             'CFR: %{customdata[3]:.2f}%<extra></extra>'
         )
     else:
         hover_template = (
             '<b>%{hovertext}</b><br>'
-            'Data: %{customdata[0]}<br>'
-            'Mortes acumuladas: %{customdata[2]:,.0f}<br>'
-            'Casos totais: %{customdata[1]:,.0f}<br>'
+            'Date: %{customdata[0]}<br>'
+            'Total Deaths: %{customdata[2]:,.0f}<br>'
+            'Total Cases: %{customdata[1]:,.0f}<br>'
             'CFR: %{customdata[3]:.2f}%<extra></extra>'
         )
 
@@ -1111,10 +1167,10 @@ def generate_map_figure(df_map: pd.DataFrame, end_date=None, metric='total_death
         uirevision='country-selection'
     )
 
-    return fig
+    return _apply_style_template(fig, height=620)
 
 
-def generate_vaccination_comparison_figure(df_health: pd.DataFrame, selected_country_names=None):
+def vaccination_comparison_figure(df_health: pd.DataFrame, selected_country_names=None):
     """Cria um gráfico de comparação de vacinação (butterfly chart) entre países"""
     df = _prepare_covid_metrics(df_health)
     selected_country_names = _resolve_country_selection(df, selected_country_names, top_n=8)
@@ -1133,9 +1189,9 @@ def generate_vaccination_comparison_figure(df_health: pd.DataFrame, selected_cou
         y=df_comparison['location'],
         x=df_comparison['people_fully_vaccinated_per_hundred'],
         orientation='h',
-        name='Cobertura de Vacinação (%)',
+        name='Vaccination Coverage (%)',
         marker_color=COLOR_PALETTE['accent'],
-        hovertemplate='<b>%{y}</b><br>Vacinados: %{x:.1f}%<extra></extra>',
+        hovertemplate='<b>%{y}</b><br>Vaccinated: %{x:.1f}%<extra></extra>',
     ))
     
     # Barra para mortalidade (invertida visualmente)
@@ -1143,9 +1199,9 @@ def generate_vaccination_comparison_figure(df_health: pd.DataFrame, selected_cou
         y=df_comparison['location'],
         x=-df_comparison['total_deaths_per_million'],
         orientation='h',
-        name='Mortes/1M (invertido)',
+        name='Deaths/1M (inverted)',
         marker_color=COLOR_PALETTE['secondary'],
-        hovertemplate='<b>%{y}</b><br>Mortes: %{x:.0f}/1M<extra></extra>',
+        hovertemplate='<b>%{y}</b><br>Deaths: %{x:.0f}/1M<extra></extra>',
     ))
     
     fig.update_layout(
@@ -1158,7 +1214,7 @@ def generate_vaccination_comparison_figure(df_health: pd.DataFrame, selected_cou
         font=dict(family=FONT_FAMILY, size=11, color=COLOR_PALETTE['neutral_dark']),
         hovermode='y unified',
         xaxis=dict(
-            title='Vacinação (%) / Mortes/1M',
+            title='Vaccination Coverage (%) / Deaths/1M',
             zeroline=True,
             zerolinecolor='rgba(100, 100, 100, 0.2)',
         ),
@@ -1166,4 +1222,6 @@ def generate_vaccination_comparison_figure(df_health: pd.DataFrame, selected_cou
         legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0),
     )
     
-    return fig
+    return _apply_style_template(fig, height=400)
+
+
