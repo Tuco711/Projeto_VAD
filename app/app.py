@@ -409,34 +409,23 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     children=[
+                        html.Div('How ageing influenced CoVID-19 mortality?', className='panel-title'),
+                        html.Div('Bars: % population 65+; Color: cumulative deaths per million', className='panel-caption'),
+                        dcc.Graph(
+                            id='age-mortality-graph',
+                            figure=age_mortality_figure(df_health_data, default_countries),
+                            className='report-graph',
+                            config={'displayModeBar': False, 'responsive': True},
+                        ),
+                    ],
+                    className='chart-card',
+                ),
+                html.Div(
+                    children=[
                         html.Div('Economic Disruption during the Pandemic', className='panel-title'),
                         dcc.Graph(
                             id='gdp-alluvial-graph',
                             figure=gdp_alluvial_figure(allowed_country_names=default_countries),
-                            className='report-graph',
-                            config={'displayModeBar': False, 'responsive': True},
-                        ),
-                    ],
-                    className='chart-card',
-                ),
-                html.Div(
-                    children=[
-                        html.Div('The Progression of the Pandemic', className='panel-title'),
-                        dcc.Graph(
-                            id='covid-evolution-graph',
-                            figure=covid_evolution_figure(df_health_data, default_countries),
-                            className='report-graph',
-                            config={'displayModeBar': False, 'responsive': True},
-                        ),
-                    ],
-                    className='chart-card',
-                ),
-                html.Div(
-                    children=[
-                        html.Div('Economic Performance under Pandemic Pressure', className='panel-title'),
-                        dcc.Graph(
-                            id='gdp-trend-graph',
-                            figure=gdp_trend_figure(default_countries),
                             className='report-graph',
                             config={'displayModeBar': False, 'responsive': True},
                         ),
@@ -457,11 +446,22 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     children=[
-                        html.Div('How ageing influenced CoVID-19 mortality?', className='panel-title'),
-                        html.Div('Bars: % population 65+; Color: cumulative deaths per million', className='panel-caption'),
+                        html.Div('Economic Performance under Pandemic Pressure', className='panel-title'),
                         dcc.Graph(
-                            id='age-mortality-graph',
-                            figure=age_mortality_figure(df_health_data, default_countries),
+                            id='gdp-trend-graph',
+                            figure=gdp_trend_figure(default_countries),
+                            className='report-graph',
+                            config={'displayModeBar': False, 'responsive': True},
+                        ),
+                    ],
+                    className='chart-card',
+                ),
+                html.Div(
+                    children=[
+                        html.Div('The Progression of the Pandemic', className='panel-title'),
+                        dcc.Graph(
+                            id='covid-evolution-graph',
+                            figure=covid_evolution_figure(df_health_data, default_countries),
                             className='report-graph',
                             config={'displayModeBar': False, 'responsive': True},
                         ),

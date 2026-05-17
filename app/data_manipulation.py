@@ -844,9 +844,8 @@ def age_mortality_figure(df_health: pd.DataFrame, selected_country_names=None):
     df_latest['total_deaths_per_million'] = pd.to_numeric(df_latest.get('total_deaths_per_million', pd.Series(dtype=float)), errors='coerce')
     df_plot = df_latest.sort_values('aged_65_older', ascending=True)
 
-    # Usar a mesma combinação de cores do gráfico de `vaccination_comparison_figure`:
-    # `accent` para valores baixos -> `secondary` para valores altos
-    colorscale = [[0, COLOR_PALETTE['accent']], [1, COLOR_PALETTE['secondary']]]
+    # Usar o mesmo esquema de cores do mapa choropleth: OrRd (Orange-Red)
+    colorscale = 'OrRd'
     marker_colors = df_plot['total_deaths_per_million']
 
     fig = go.Figure()
