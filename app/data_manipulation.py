@@ -568,6 +568,11 @@ def generate_age_mortality_figure(df_health: pd.DataFrame, selected_country_name
     df_latest = prepare_map_data(df, preprocessed=True)[available_columns].copy()
     df_latest = df_latest[df_latest['location'].isin(selected_country_names)].dropna(subset=['median_age', 'total_deaths_per_million'])
 
+    gdp_series = pd.to_numeric(df_latest['gdp_per_capita'], errors='coerce') if 'gdp_per_capita' in df_latest.columns else pd.Series(dtype=float)
+    gdp_fallback = gdp_series.dropna().median() if not gdp_series.dropna().empty else 50_000
+    marker_sizes = gdp_series.fillna(gdp_fallback).div(5_000) if not gdp_series.empty else pd.Series(dtype=float)
+    sizeref = 2 * marker_sizes.max() / (44 ** 2) if not marker_sizes.empty else 1
+
     # Criar colormap por continente
     continent_colors = {
         'Africa': '#ef4444',
@@ -588,10 +593,11 @@ def generate_age_mortality_figure(df_health: pd.DataFrame, selected_country_name
             mode='markers',
             name=continent or 'Dados',
             marker=dict(
-                size=df_continent['gdp_per_capita'] / 5000 if 'gdp_per_capita' in df_continent.columns else 10,
+                size=(pd.to_numeric(df_continent['gdp_per_capita'], errors='coerce').fillna(gdp_fallback).div(5_000)
+                      if 'gdp_per_capita' in df_continent.columns else 10),
                 color=continent_colors.get(continent, COLOR_PALETTE['primary']) if continent else COLOR_PALETTE['primary'],
                 sizemode='diameter',
-                sizeref=2 * (max(df_latest['gdp_per_capita'] / 5000) if 'gdp_per_capita' in df_latest.columns else 10) / (44 ** 2),
+                sizeref=sizeref,
                 line=dict(color='white', width=1.5),
                 opacity=0.75
             ),
@@ -712,7 +718,7 @@ def build_map_base_data(df_health: pd.DataFrame) -> pd.DataFrame:
     df_map['date'] = pd.to_datetime(df_map['date'])
     df_map = df_map[
         df_map['continent'].notna()
-        & (~df_map['location'].isin(['World', 'International', 'European Union']))
+        # & (~df_map['location'].isin(['World', 'International', 'European Union']))
         & (df_map['iso_code'].astype(str).str.len() == 3)
     ].copy()
 
@@ -731,7 +737,7 @@ def prepare_map_data(df_health: pd.DataFrame, end_date=None, preprocessed: bool 
     if not preprocessed:
         df_map = df_map[
             df_map['continent'].notna()
-            & (~df_map['location'].isin(['World', 'International', 'European Union']))
+            # & (~df_map['location'].isin(['World', 'International', 'European Union']))
         ].copy()
 
         df_map = df_map.sort_values('date')
