@@ -77,7 +77,7 @@ def _extract_gdp_year_columns(df_gdp: pd.DataFrame) -> dict:
     return dict(sorted(year_columns.items()))
 
 
-def generate_gdp_alluvial_figure(filepath: Path = GDP_FILEPATH, top_n: int = 12, allowed_country_names=None):
+def gdp_alluvial_figure(filepath: Path = GDP_FILEPATH, top_n: int = 12, allowed_country_names=None):
     df_gdp = pd.read_csv(filepath)
     year_columns = _extract_gdp_year_columns(df_gdp)
 
@@ -287,7 +287,7 @@ def _prepare_covid_metrics(df_health: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def generate_covid_evolution_figure(df_health: pd.DataFrame, selected_country_names=None):
+def covid_evolution_figure(df_health: pd.DataFrame, selected_country_names=None):
     df = _prepare_covid_metrics(df_health)
     selected_country_names = _resolve_country_selection(df, selected_country_names, top_n=6)
 
@@ -390,7 +390,7 @@ def generate_covid_evolution_figure(df_health: pd.DataFrame, selected_country_na
     return fig
 
 
-def generate_gdp_trend_figure(selected_country_names=None, filepath: Path = GDP_FILEPATH):
+def gdp_trend_figure(selected_country_names=None, filepath: Path = GDP_FILEPATH):
     df_gdp = pd.read_csv(filepath)
     year_columns = _extract_gdp_year_columns(df_gdp)
     selected_years = [year for year in range(2019, 2025) if year in year_columns]
@@ -467,7 +467,7 @@ def generate_gdp_trend_figure(selected_country_names=None, filepath: Path = GDP_
     return fig
 
 
-def generate_gdp_mortality_scatter_figure(df_health: pd.DataFrame, selected_country_names=None, filepath: Path = GDP_FILEPATH):
+def gdp_mortality_scatter_figure(df_health: pd.DataFrame, selected_country_names=None, filepath: Path = GDP_FILEPATH):
     df = _prepare_covid_metrics(df_health)
     selected_country_names = _resolve_country_selection(df, selected_country_names, top_n=8)
 
@@ -600,7 +600,7 @@ def generate_gdp_mortality_scatter_figure(df_health: pd.DataFrame, selected_coun
     return fig
 
 
-def generate_age_mortality_figure(df_health: pd.DataFrame, selected_country_names=None):
+def age_mortality_figure(df_health: pd.DataFrame, selected_country_names=None):
     df = _prepare_covid_metrics(df_health)
     selected_country_names = _resolve_country_selection(df, selected_country_names, top_n=8)
 
@@ -734,7 +734,7 @@ def load_health_covid_data(filepath: Path) -> pd.DataFrame | None:
     else:
         return None
 
-def generate_date_slider_marks(df_health: pd.DataFrame, num_marks: int = 6) -> dict:
+def date_slider_marks(df_health: pd.DataFrame, num_marks: int = 6) -> dict:
     date_series = pd.to_datetime(df_health['date']).dropna()
     if date_series.empty:
         return {}
@@ -788,7 +788,7 @@ def prepare_map_data(df_health: pd.DataFrame, end_date=None, preprocessed: bool 
 
     return df_map
 
-def generate_map_metadata(metric: str = 'cfr_pct') -> dict:
+def map_metadata(metric: str = 'cfr_pct') -> dict:
     if metric == 'cfr_pct':
         return {
             'title': 'Taxa de Letalidade (CFR) - % de óbitos entre casos confirmados',
@@ -814,9 +814,9 @@ def generate_map_metadata(metric: str = 'cfr_pct') -> dict:
             'color_label': metric
         }
 
-def generate_map_figure(df_map: pd.DataFrame, end_date=None, metric='total_deaths', color_max=None, selected_country_names=None):
+def map_figure(df_map: pd.DataFrame, end_date=None, metric='total_deaths', color_max=None, selected_country_names=None):
     metric = metric or 'total_deaths'
-    metadata = generate_map_metadata(metric)
+    metadata = map_metadata(metric)
     if end_date is not None:
         end_date = pd.to_datetime(end_date)
         if metric == 'cfr_pct':
@@ -945,7 +945,7 @@ def generate_map_figure(df_map: pd.DataFrame, end_date=None, metric='total_death
     return fig
 
 
-def generate_vaccination_comparison_figure(df_health: pd.DataFrame, selected_country_names=None):
+def vaccination_comparison_figure(df_health: pd.DataFrame, selected_country_names=None):
     """Cria um gráfico de comparação de vacinação (butterfly chart) entre países"""
     df = _prepare_covid_metrics(df_health)
     selected_country_names = _resolve_country_selection(df, selected_country_names, top_n=8)
