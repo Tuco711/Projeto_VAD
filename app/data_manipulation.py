@@ -500,49 +500,79 @@ def generate_gdp_mortality_scatter_figure(df_health: pd.DataFrame, selected_coun
     df_merged['color'] = df_merged['continent'].map(continent_colors) if 'continent' in df_merged.columns else COLOR_PALETTE['primary']
 
     fig = go.Figure()
-    
+
+    # Robust marker sizing: map population to a bounded visual range
+    if 'population' in df_merged.columns and not df_merged['population'].isna().all():
+        pop_max = df_merged['population'].max()
+        pop_min = df_merged['population'].min()
+        pop_max = pop_max if pop_max > 0 else 1
+    else:
+        pop_max = 1
+
     for continent in (df_merged['continent'].unique() if 'continent' in df_merged.columns else [None]):
         df_continent = df_merged[df_merged['continent'] == continent] if continent else df_merged
-        
+
+        # scale sizes between 8 and 48 for readability
+        if 'population' in df_continent.columns and not df_continent['population'].isna().all():
+            sizes = ((df_continent['population'] / pop_max) * 40).fillna(0) + 8
+        else:
+            sizes = 10
+
         fig.add_trace(go.Scatter(
             x=df_continent['gdp_growth_pct'],
             y=df_continent['total_deaths_per_million'],
             mode='markers',
             name=continent or 'Dados',
             marker=dict(
-                size=df_continent['population'] / 1_000_000 if 'population' in df_continent.columns else 10,
+                size=sizes,
                 color=continent_colors.get(continent, COLOR_PALETTE['primary']) if continent else COLOR_PALETTE['primary'],
-                sizemode='diameter',
-                sizeref=2 * max(df_merged['population'] / 1_000_000) / (44 ** 2) if 'population' in df_merged.columns else 1,
-                line=dict(color='white', width=1.5),
-                opacity=0.75
+                line=dict(color='white', width=1.25),
+                opacity=0.85
             ),
             text=df_continent['location'],
-            hovertemplate='<b>%{text}</b><br>PIB crescimento: %{x:.1f}%<br>Mortes: %{y:,.0f}/1M<extra></extra>',
+            hovertemplate='<b>%{text}</b><br>Crescimento do PIB: %{x:.1f}%<br>Mortes: %{y:,.0f} por milhão<extra></extra>',
         ))
 
+    # Add a linear trend line to help interpret the relationship
+    mask = df_merged['gdp_growth_pct'].notna() & df_merged['total_deaths_per_million'].notna()
+    if mask.sum() >= 2:
+        x_vals = pd.to_numeric(df_merged.loc[mask, 'gdp_growth_pct'], errors='coerce').to_numpy(dtype=float)
+        y_vals = pd.to_numeric(df_merged.loc[mask, 'total_deaths_per_million'], errors='coerce').to_numpy(dtype=float)
+        valid = np.isfinite(x_vals) & np.isfinite(y_vals)
+        x_vals = x_vals[valid]
+        y_vals = y_vals[valid]
+        try:
+            coeffs = np.polyfit(x_vals, y_vals, 1)
+            x_line = np.linspace(x_vals.min(), x_vals.max(), 100)
+            y_line = np.polyval(coeffs, x_line)
+            fig.add_trace(go.Scatter(x=x_line, y=y_line, mode='lines', name='Tendência (linear)', line=dict(dash='dash', color='#111827'), hoverinfo='skip'))
+        except Exception:
+            pass
+
+    # Add a small legend/annotation explaining point size
     fig.update_layout(
+        title='PIB vs Mortalidade — Crescimento do PIB (2019–2024) vs Mortes por milhão',
         template='plotly_white',
-        height=450,
-        margin=dict(t=80, l=50, r=20, b=30),
+        height=480,
+        margin=dict(t=100, l=60, r=20, b=40),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         font=dict(family=FONT_FAMILY, size=11, color=COLOR_PALETTE['neutral_dark']),
         hovermode='closest',
         uirevision='country-selection',
         xaxis=dict(
-            title='Crescimento do PIB 2019-2024 (%)',
+            title='Crescimento do PIB 2019–2024 (%)',
             zeroline=True,
-            zerolinecolor='rgba(100, 100, 100, 0.2)',
+            zerolinecolor='rgba(100, 100, 100, 0.18)',
             showgrid=True,
             gridwidth=1,
-            gridcolor='rgba(0,0,0,0.1)'
+            gridcolor='rgba(0,0,0,0.06)'
         ),
         yaxis=dict(
-            title='Mortes acumuladas por milhão',
+            title='Mortes por milhão (acumuladas)',
             showgrid=True,
             gridwidth=1,
-            gridcolor='rgba(0,0,0,0.1)'
+            gridcolor='rgba(0,0,0,0.06)'
         ),
         legend=dict(
             orientation='v',
@@ -550,10 +580,21 @@ def generate_gdp_mortality_scatter_figure(df_health: pd.DataFrame, selected_coun
             y=0.99,
             xanchor='right',
             x=0.99,
-            bgcolor='rgba(255,255,255,0.7)',
+            bgcolor='rgba(255,255,255,0.8)',
             bordercolor='rgba(200, 200, 200, 0.3)',
             borderwidth=1
-        )
+        ),
+        annotations=[
+            dict(
+                x=1,
+                y=-0.12,
+                xref='paper',
+                yref='paper',
+                showarrow=False,
+                text='Tamanho do ponto ~ população do país (maior = população maior)',
+                font=dict(size=10, color=COLOR_PALETTE['neutral_dark'])
+            )
+        ]
     )
 
     return fig
@@ -886,8 +927,8 @@ def generate_map_figure(df_map: pd.DataFrame, end_date=None, metric='total_death
 
     fig.update_layout(
         template='plotly_white',
-        height=620,
-        margin=dict(t=60, l=10, r=10, b=10),
+        height=540,
+        margin=dict(t=20, l=10, r=10, b=0),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         font=dict(family=FONT_FAMILY, size=10, color=COLOR_PALETTE['neutral_dark']),

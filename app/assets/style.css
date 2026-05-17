@@ -107,7 +107,7 @@ body {
 
 .dashboard-stage {
   display: grid;
-  grid-template-columns: minmax(0, 1.85fr) minmax(320px, 0.95fr);
+  grid-template-columns: 1fr;
   gap: 18px;
   align-items: start;
   margin-bottom: 20px;
@@ -125,15 +125,15 @@ body {
 }
 
 .dashboard-card--main {
-  padding: 16px 16px 12px;
+  padding: 12px 12px 6px;
 }
 
 .panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 1px;
+  margin-bottom: 1px;
 }
 
 .panel-header--stacked {
@@ -174,7 +174,7 @@ body {
 }
 
 .dashboard-graph--map {
-  height: 620px;
+  height: 540px;
   margin-bottom: 0;
 }
 
@@ -183,6 +183,13 @@ body {
   flex-direction: column;
   gap: 12px;
   padding: 16px;
+}
+
+.kpi-blocks {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
 }
 
 .kpi-card,
@@ -218,6 +225,9 @@ body {
 
 .chart-card {
   padding: 14px 14px 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .chart-card--wide {
@@ -238,7 +248,8 @@ body {
 }
 
 .chart-card--wide .report-graph {
-  min-height: 620px;
+  /* ensure internal graph fills the square block */
+  height: 100% !important;
 }
 
 .chart-card .js-plotly-plot,
@@ -267,13 +278,8 @@ body {
 
 @media (max-width: 1240px) {
   .dashboard-toolbar,
-  .dashboard-stage,
   .dashboard-grid {
     grid-template-columns: 1fr;
-  }
-
-  .chart-card--wide {
-    grid-column: span 1;
   }
 
   .timeline-controls-wrap {
@@ -282,6 +288,10 @@ body {
 
   .metric-dropdown {
     min-width: 0;
+  }
+
+  .kpi-blocks {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -427,6 +437,13 @@ body {
 }
 .rc-slider-mark {
   transform: translateY(10px);
+}
+
+/* Remove numeric tooltip/bubble shown by rc-slider in the left panel */
+.sidebar-contents .rc-slider-tooltip,
+.sidebar-contents .rc-slider-tooltip *,
+.sidebar-contents .rc-tooltip {
+  display: none !important;
 }
 
 .dashboard-graph {
