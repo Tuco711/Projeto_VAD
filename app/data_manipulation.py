@@ -19,7 +19,7 @@ COLOR_PALETTE = {
 }
 
 # Definir fonte padrão para toda a aplicação
-FONT_FAMILY = 'Segoe UI, Roboto, Helvetica, Arial, sans-serif'
+FONT_FAMILY = 'Inter, Segoe UI, Roboto, Helvetica, Arial, sans-serif'
 
 FILEPATH = Path('.\\datasets\\owid-covid-data.csv')
 GDP_FILEPATH = Path('.\\datasets\\GDP_data.csv')
@@ -28,15 +28,41 @@ GDP_FILEPATH = Path('.\\datasets\\GDP_data.csv')
 def _apply_style_template(fig, title_text=None, subtitle_text=None, height=450):
     """Aplica estilo consistente a todos os gráficos"""
     fig.update_layout(
-        template='plotly_white',
-        height=height,
-        margin=dict(t=80 if subtitle_text else 70, l=30, r=20, b=30),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(family=FONT_FAMILY, size=11, color=COLOR_PALETTE['neutral_dark']),
-        hovermode='x unified',
-        uirevision='country-selection',
-    )
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+
+    font=dict(
+        family="Inter",
+        size=14,
+        color="#0f172a"
+    ),
+
+    title_font=dict(
+        size=22,
+        color="#0f172a"
+    ),
+
+    margin=dict(
+        l=30,
+        r=20,
+        t=70,
+        b=30
+    ),
+
+    transition_duration=400
+)
+
+    fig.update_xaxes(
+        gridcolor="rgba(15,23,42,0.05)",
+        zeroline=False,
+        showline=False
+)
+
+    fig.update_yaxes(
+        gridcolor="rgba(15,23,42,0.05)",
+        zeroline=False,
+        showline=False
+)
     
     # Adicionar título e subtítulo se fornecidos
     if title_text or subtitle_text:
@@ -77,7 +103,7 @@ def _extract_gdp_year_columns(df_gdp: pd.DataFrame) -> dict:
     return dict(sorted(year_columns.items()))
 
 
-def generate_gdp_alluvial_figure(filepath: Path = GDP_FILEPATH, top_n: int = 12, allowed_country_names=None):
+def gdp_alluvial_figure(filepath: Path = GDP_FILEPATH, top_n: int = 12, allowed_country_names=None):
     df_gdp = pd.read_csv(filepath)
     year_columns = _extract_gdp_year_columns(df_gdp)
 
@@ -228,7 +254,7 @@ def generate_gdp_alluvial_figure(filepath: Path = GDP_FILEPATH, top_n: int = 12,
         ],
     )
 
-    return fig
+    return _apply_style_template(fig, height=layout_height)
 
 
 def _resolve_country_selection(df_health: pd.DataFrame, selected_country_names=None, top_n: int = 6) -> list[str]:
@@ -306,7 +332,7 @@ def _prepare_covid_metrics(df_health: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def generate_covid_evolution_figure(df_health: pd.DataFrame, selected_country_names=None):
+def covid_evolution_figure(df_health: pd.DataFrame, selected_country_names=None):
     df = _prepare_covid_metrics(df_health)
     selected_country_names = _resolve_country_selection(df, selected_country_names, top_n=6)
     selected_country_names = _collapse_to_world_when_all_countries_selected(df, selected_country_names)
@@ -324,9 +350,9 @@ def generate_covid_evolution_figure(df_health: pd.DataFrame, selected_country_na
     df_plot['month'] = df_plot['date'].dt.to_period('M').dt.to_timestamp()
 
     metric_specs = [
-        ('new_cases_smoothed_per_million', 'Incidência de Casos', 'Número de novos casos confirmados por milhão de habitantes, suavizados em 7 dias', COLOR_PALETTE['primary']),
-        ('new_deaths_smoothed_per_million', 'Mortalidade Atribuída', 'Número de mortes por COVID-19 por milhão de habitantes, suavizadas em 7 dias', COLOR_PALETTE['secondary']),
-        ('people_fully_vaccinated_per_hundred', 'Cobertura de Vacinação', 'Percentual da população que completou o esquema primário de vacinação', COLOR_PALETTE['accent']),
+        ('new_cases_smoothed_per_million', 'Incidence of Cases', 'Number of new confirmed cases per million inhabitants, smoothed over 7 days', COLOR_PALETTE['primary']),
+        ('new_deaths_smoothed_per_million', 'Attributable Mortality', 'Number of deaths from COVID-19 per million inhabitants, smoothed over 7 days', COLOR_PALETTE['secondary']),
+        ('people_fully_vaccinated_per_hundred', 'Vaccination Coverage', 'Percentage of the population that has completed the primary vaccination scheme', COLOR_PALETTE['accent']),
     ]
 
     fig = make_subplots(
@@ -389,9 +415,9 @@ def generate_covid_evolution_figure(df_health: pd.DataFrame, selected_country_na
     )
     
     # Atualizar eixos Y com melhor formatação
-    fig.update_yaxes(title_text='Casos/1M', row=1, col=1, tickformat=',d')
-    fig.update_yaxes(title_text='Óbitos/1M', row=2, col=1, tickformat=',d')
-    fig.update_yaxes(title_text='Cobertura %', row=3, col=1, tickformat='.1%')
+    fig.update_yaxes(title_text='Cases/1M', row=1, col=1, tickformat=',d')
+    fig.update_yaxes(title_text='Deaths/1M', row=2, col=1, tickformat=',d')
+    fig.update_yaxes(title_text='Vaccination Coverage %', row=3, col=1, tickformat='.1%')
     fig.update_xaxes(title_text='', row=3, col=1)
     
     # Adicionar descrições das métricas como anotações
@@ -407,10 +433,10 @@ def generate_covid_evolution_figure(df_health: pd.DataFrame, selected_country_na
             align='left'
         )
 
-    return fig
+    return _apply_style_template(fig, height=720)
 
 
-def generate_gdp_trend_figure(selected_country_names=None, filepath: Path = GDP_FILEPATH):
+def gdp_trend_figure(selected_country_names=None, filepath: Path = GDP_FILEPATH):
     df_gdp = pd.read_csv(filepath)
     year_columns = _extract_gdp_year_columns(df_gdp)
     selected_years = [year for year in range(2019, 2025) if year in year_columns]
@@ -458,7 +484,7 @@ def generate_gdp_trend_figure(selected_country_names=None, filepath: Path = GDP_
             name=country,
             line=dict(color=color_map[country], width=3),
             marker=dict(size=8, symbol='circle'),
-            hovertemplate='<b>%{fullData.name}</b><br>%{x}<br>PIB: $%{y:,.0f}<extra></extra>',
+            hovertemplate='<b>%{fullData.name}</b><br>%{x}<br>GDP: $%{y:,.0f}<extra></extra>',
         ))
 
     fig.update_layout(
@@ -480,14 +506,14 @@ def generate_gdp_trend_figure(selected_country_names=None, filepath: Path = GDP_
             bordercolor='rgba(200, 200, 200, 0.3)',
             borderwidth=1
         ),
-        xaxis=dict(title='Ano', showgrid=True, gridwidth=1, gridcolor='rgba(0,0,0,0.1)'),
-        yaxis=dict(title='PIB (USD correntes)', tickformat=',.0f', showgrid=True, gridwidth=1, gridcolor='rgba(0,0,0,0.1)'),
+        xaxis=dict(title='Year', showgrid=True, gridwidth=1, gridcolor='rgba(15,23,42,0.06)'),
+        yaxis=dict(title='GDP (USD current)', tickformat=',.0f', showgrid=True, gridwidth=1, gridcolor='rgba(15,23,42,0.06)'),
     )
 
-    return fig
+    return _apply_style_template(fig)
 
 
-def generate_gdp_mortality_scatter_figure(df_health: pd.DataFrame, selected_country_names=None, filepath: Path = GDP_FILEPATH):
+def gdp_mortality_scatter_figure(df_health: pd.DataFrame, selected_country_names=None, filepath: Path = GDP_FILEPATH):
     df = _prepare_covid_metrics(df_health)
     selected_country_names = _resolve_country_selection(df, selected_country_names, top_n=8)
 
@@ -548,7 +574,7 @@ def generate_gdp_mortality_scatter_figure(df_health: pd.DataFrame, selected_coun
                 opacity=0.75
             ),
             text=df_continent['location'],
-            hovertemplate='<b>%{text}</b><br>PIB crescimento: %{x:.1f}%<br>Mortes: %{y:,.0f}/1M<extra></extra>',
+            hovertemplate='<b>%{text}</b><br>GDP Growth: %{x:.1f}%<br>Deaths: %{y:,.0f}/1M<extra></extra>',
         ))
 
     fig.update_layout(
@@ -561,18 +587,18 @@ def generate_gdp_mortality_scatter_figure(df_health: pd.DataFrame, selected_coun
         hovermode='closest',
         uirevision='country-selection',
         xaxis=dict(
-            title='Crescimento do PIB 2019-2024 (%)',
+            title='GDP Growth 2019-2024 (%)',
             zeroline=True,
             zerolinecolor='rgba(100, 100, 100, 0.2)',
             showgrid=True,
             gridwidth=1,
-            gridcolor='rgba(0,0,0,0.1)'
+            gridcolor='rgba(15,23,42,0.06)'
         ),
         yaxis=dict(
-            title='Mortes acumuladas por milhão',
+            title='Cumulative Deaths per Million',
             showgrid=True,
             gridwidth=1,
-            gridcolor='rgba(0,0,0,0.1)'
+            gridcolor='rgba(15,23,42,0.06)'
         ),
         legend=dict(
             orientation='v',
@@ -586,10 +612,10 @@ def generate_gdp_mortality_scatter_figure(df_health: pd.DataFrame, selected_coun
         )
     )
 
-    return fig
+    return _apply_style_template(fig)
 
 
-def generate_age_mortality_figure(df_health: pd.DataFrame, selected_country_names=None):
+def age_mortality_figure(df_health: pd.DataFrame, selected_country_names=None):
     df = _prepare_covid_metrics(df_health)
     selected_country_names = _resolve_country_selection(df, selected_country_names, top_n=8)
 
@@ -632,7 +658,7 @@ def generate_age_mortality_figure(df_health: pd.DataFrame, selected_country_name
                 opacity=0.75
             ),
             text=df_continent['location'],
-            hovertemplate='<b>%{text}</b><br>Idade mediana: %{x:.1f}<br>Mortes: %{y:,.0f}/1M<extra></extra>',
+            hovertemplate='<b>%{text}</b><br>Median Age: %{x:.1f}<br>Deaths: %{y:,.0f}/1M<extra></extra>',
         ))
 
     fig.update_layout(
@@ -645,16 +671,16 @@ def generate_age_mortality_figure(df_health: pd.DataFrame, selected_country_name
         hovermode='closest',
         uirevision='country-selection',
         xaxis=dict(
-            title='Idade mediana (anos)',
+            title='Median Age (years)',
             showgrid=True,
             gridwidth=1,
-            gridcolor='rgba(0,0,0,0.1)'
+            gridcolor='rgba(15,23,42,0.06)'
         ),
         yaxis=dict(
-            title='Mortes acumuladas por milhão',
+            title='Cumulative Deaths per Million',
             showgrid=True,
             gridwidth=1,
-            gridcolor='rgba(0,0,0,0.1)'
+            gridcolor='rgba(15,23,42,0.06)'
         ),
         legend=dict(
             orientation='v',
@@ -668,7 +694,7 @@ def generate_age_mortality_figure(df_health: pd.DataFrame, selected_country_name
         )
     )
 
-    return fig
+    return _apply_style_template(fig)
 
 def load_full_covid_data(filepath: Path) -> pd.DataFrame | None:
     try:
@@ -729,7 +755,7 @@ def load_health_covid_data(filepath: Path) -> pd.DataFrame | None:
     else:
         return None
 
-def generate_date_slider_marks(df_health: pd.DataFrame, num_marks: int = 6) -> dict:
+def date_slider_marks(df_health: pd.DataFrame, num_marks: int = 6) -> dict:
     date_series = pd.to_datetime(df_health['date']).dropna()
     if date_series.empty:
         return {}
@@ -783,50 +809,50 @@ def prepare_map_data(df_health: pd.DataFrame, end_date=None, preprocessed: bool 
 
     return df_map
 
-def generate_map_metadata(metric: str = 'cfr_pct') -> dict:
+def map_metadata(metric: str = 'cfr_pct') -> dict:
     if metric == 'cfr_pct':
         return {
-            'title': 'Taxa de Letalidade (CFR) - % de óbitos entre casos confirmados',
+            'title': 'Case Fatality Rate(CFR) - % of deaths among confirmed cases',
             'color_scale': 'Reds',
             'color_label': 'CFR (%)'
         }
     elif metric == 'total_cases':
         return {
-            'title': 'Casos Confirmados Cumulativos - Total de infecções registadas',
+            'title': 'Cumulative Confirmed Cases - Total of infections recorded',
             'color_scale': 'Blues',
             'color_label': 'Total Cases'
         }
     elif metric == 'total_deaths':
         return {
-            'title': 'Óbitos Cumulativos por COVID-19 - Mortes confirmadas',
+            'title': 'Cumulative Deaths from COVID-19 - Confirmed deaths',
             'color_scale': 'OrRd',
-            'color_label': 'Mortes acumuladas'
+            'color_label': 'Cumulative Deaths'
         }
     else:
         return {
-            'title': 'Mapa Mundial - Métrica Desconecida',
+            'title': 'World Map - Unknown Metric',
             'color_scale': 'Greys',
             'color_label': metric
         }
 
-def generate_map_figure(df_map: pd.DataFrame, end_date=None, metric='total_deaths', color_max=None, selected_country_names=None):
+def map_figure(df_map: pd.DataFrame, end_date=None, metric='total_deaths', color_max=None, selected_country_names=None):
     metric = metric or 'total_deaths'
-    metadata = generate_map_metadata(metric)
+    metadata = map_metadata(metric)
     if end_date is not None:
         end_date = pd.to_datetime(end_date)
         if metric == 'cfr_pct':
-            title = f"Mapa Mundial - CFR (%) até {end_date.strftime('%d/%m/%Y')}"
+            title = f"World Map - CFR (%) until {end_date.strftime('%d/%m/%Y')}"
         elif metric == 'total_cases':
-            title = f"Mapa Mundial - Total de Casos até {end_date.strftime('%d/%m/%Y')}"
+            title = f"World Map - Total Cases until {end_date.strftime('%d/%m/%Y')}"
         else:
-            title = f"Mapa Mundial - Mortes Acumuladas até {end_date.strftime('%d/%m/%Y')}"
+            title = f"World Map - Deaths until {end_date.strftime('%d/%m/%Y')}"
     else:
         if metric == 'cfr_pct':
-            title = 'Mapa Mundial - CFR (%)'
+            title = 'World Map - CFR (%)'
         elif metric == 'total_cases':
-            title = 'Mapa Mundial - Total de Casos'
+            title = 'World Map - Total Cases'
         else:
-            title = 'Mapa Mundial - Mortes Acumuladas'
+            title = 'World Map - Deaths'
 
     if color_max is None:
         color_max = df_map[metric].max()
@@ -864,7 +890,7 @@ def generate_map_figure(df_map: pd.DataFrame, end_date=None, metric='total_death
                     showscale=False,
                     marker_line_color='rgba(148, 163, 184, 0.25)',
                     marker_line_width=0.2,
-                    hovertemplate='<b>%{text}</b><br>Data: %{customdata[0]}<br>Casos totais: %{customdata[1]:,.0f}<br>Mortes totais: %{customdata[2]:,.0f}<br>CFR: %{customdata[3]:.2f}%<extra></extra>',
+                    hovertemplate='<b>%{text}</b><br>Data: %{customdata[0]}<br>Total Cases: %{customdata[1]:,.0f}<br>Total Deaths: %{customdata[2]:,.0f}<br>CFR: %{customdata[3]:.2f}%<extra></extra>',
                 )
             )
         fig.add_trace(
@@ -887,7 +913,7 @@ def generate_map_figure(df_map: pd.DataFrame, end_date=None, metric='total_death
                 ),
                 marker_line_color='rgba(15, 23, 42, 0.55)',
                 marker_line_width=0.8,
-                hovertemplate='<b>%{text}</b><br>Data: %{customdata[0]}<br>Casos totais: %{customdata[1]:,.0f}<br>Mortes totais: %{customdata[2]:,.0f}<br>CFR: %{customdata[3]:.2f}%<extra></extra>',
+                hovertemplate='<b>%{text}</b><br>Data: %{customdata[0]}<br>Total Cases: %{customdata[1]:,.0f}<br>Total Deaths: %{customdata[2]:,.0f}<br>CFR: %{customdata[3]:.2f}%<extra></extra>',
             )
         )
     else:
@@ -906,17 +932,17 @@ def generate_map_figure(df_map: pd.DataFrame, end_date=None, metric='total_death
     if metric == 'cfr_pct':
         hover_template = (
             '<b>%{hovertext}</b><br>'
-            'Data: %{customdata[0]}<br>'
-            'Casos totais: %{customdata[1]:,.0f}<br>'
-            'Mortes totais: %{customdata[2]:,.0f}<br>'
+            'Date: %{customdata[0]}<br>'
+            'Total Cases: %{customdata[1]:,.0f}<br>'
+            'Total Deaths: %{customdata[2]:,.0f}<br>'
             'CFR: %{customdata[3]:.2f}%<extra></extra>'
         )
     else:
         hover_template = (
             '<b>%{hovertext}</b><br>'
-            'Data: %{customdata[0]}<br>'
-            'Mortes acumuladas: %{customdata[2]:,.0f}<br>'
-            'Casos totais: %{customdata[1]:,.0f}<br>'
+            'Date: %{customdata[0]}<br>'
+            'Total Deaths: %{customdata[2]:,.0f}<br>'
+            'Total Cases: %{customdata[1]:,.0f}<br>'
             'CFR: %{customdata[3]:.2f}%<extra></extra>'
         )
 
@@ -940,10 +966,10 @@ def generate_map_figure(df_map: pd.DataFrame, end_date=None, metric='total_death
         uirevision='country-selection'
     )
 
-    return fig
+    return _apply_style_template(fig, height=620)
 
 
-def generate_vaccination_comparison_figure(df_health: pd.DataFrame, selected_country_names=None):
+def vaccination_comparison_figure(df_health: pd.DataFrame, selected_country_names=None):
     """Cria um gráfico de comparação de vacinação (butterfly chart) entre países"""
     df = _prepare_covid_metrics(df_health)
     selected_country_names = _resolve_country_selection(df, selected_country_names, top_n=8)
@@ -962,9 +988,9 @@ def generate_vaccination_comparison_figure(df_health: pd.DataFrame, selected_cou
         y=df_comparison['location'],
         x=df_comparison['people_fully_vaccinated_per_hundred'],
         orientation='h',
-        name='Cobertura de Vacinação (%)',
+        name='Vaccination Coverage (%)',
         marker_color=COLOR_PALETTE['accent'],
-        hovertemplate='<b>%{y}</b><br>Vacinados: %{x:.1f}%<extra></extra>',
+        hovertemplate='<b>%{y}</b><br>Vaccinated: %{x:.1f}%<extra></extra>',
     ))
     
     # Barra para mortalidade (invertida visualmente)
@@ -972,9 +998,9 @@ def generate_vaccination_comparison_figure(df_health: pd.DataFrame, selected_cou
         y=df_comparison['location'],
         x=-df_comparison['total_deaths_per_million'],
         orientation='h',
-        name='Mortes/1M (invertido)',
+        name='Deaths/1M (inverted)',
         marker_color=COLOR_PALETTE['secondary'],
-        hovertemplate='<b>%{y}</b><br>Mortes: %{x:.0f}/1M<extra></extra>',
+        hovertemplate='<b>%{y}</b><br>Deaths: %{x:.0f}/1M<extra></extra>',
     ))
     
     fig.update_layout(
@@ -987,7 +1013,7 @@ def generate_vaccination_comparison_figure(df_health: pd.DataFrame, selected_cou
         font=dict(family=FONT_FAMILY, size=11, color=COLOR_PALETTE['neutral_dark']),
         hovermode='y unified',
         xaxis=dict(
-            title='Vacinação (%) / Mortes/1M',
+            title='Vaccination Coverage (%) / Deaths/1M',
             zeroline=True,
             zerolinecolor='rgba(100, 100, 100, 0.2)',
         ),
@@ -995,4 +1021,6 @@ def generate_vaccination_comparison_figure(df_health: pd.DataFrame, selected_cou
         legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0),
     )
     
-    return fig
+    return _apply_style_template(fig, height=400)
+
+
