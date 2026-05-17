@@ -251,9 +251,9 @@ app.layout = html.Div(
             children=[
                 html.Div(
                     children=[
-                        html.Div('CoVID-19 Dashboard', className='dashboard-title'),
+                        html.Div('The Pandemic Lens', className='dashboard-title'),
                         html.Div(
-                            'Explore how the CoVID-19 pandemic evolved over time and how it impacted GDP and other demographic trends across the world. 🌍📊',
+                            'Health, economy and demographic trends during the CoVID-19 pandemic 🌍📊',
                             className='dashboard-subtitle',
                         ),
                     ],
@@ -333,7 +333,7 @@ app.layout = html.Div(
                     children=[
                         html.Div(
                             children=[
-                                html.Div('World Map', className='panel-title'),
+                                html.Div('Tracking human fatalities', className='panel-title'),
                                 html.Div(id='selection-summary', className='selection-summary'),
                             ],
                             className='panel-header',
@@ -394,7 +394,7 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     children=[
-                        html.Div('GDP Evolution by Country', className='panel-title'),
+                        html.Div('Economic Disruption during the Pandemic', className='panel-title'),
                         dcc.Graph(
                             id='gdp-alluvial-graph',
                             figure=gdp_alluvial_figure(allowed_country_names=default_countries),
@@ -406,7 +406,7 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     children=[
-                        html.Div('Covid Evolution', className='panel-title'),
+                        html.Div('The Progression of the Pandemic', className='panel-title'),
                         dcc.Graph(
                             id='covid-evolution-graph',
                             figure=covid_evolution_figure(df_health_data, default_countries),
@@ -418,7 +418,7 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     children=[
-                        html.Div('GDP and Economic Resilience', className='panel-title'),
+                        html.Div('Economic Performance under Pandemic Pressure', className='panel-title'),
                         dcc.Graph(
                             id='gdp-trend-graph',
                             figure=gdp_trend_figure(default_countries),
@@ -430,7 +430,7 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     children=[
-                        html.Div('GDP vs Mortality', className='panel-title'),
+                        html.Div('Did stronger economies experience lower mortality?', className='panel-title'),
                         dcc.Graph(
                             id='gdp-mortality-scatter-graph',
                             figure=gdp_mortality_scatter_figure(df_health_data, default_countries),
@@ -442,7 +442,7 @@ app.layout = html.Div(
                 ),
                 html.Div(
                     children=[
-                        html.Div('Ageing and Mortality', className='panel-title'),
+                        html.Div('How ageing influenced CoVID-19 mortality?', className='panel-title'),
                         dcc.Graph(
                             id='age-mortality-graph',
                             figure=age_mortality_figure(df_health_data, default_countries),
