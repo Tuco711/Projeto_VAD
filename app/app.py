@@ -8,13 +8,13 @@ try:
         FILEPATH,
         build_map_base_data,
         prepare_map_data,
-        date_slider_marks,
-        map_figure,
-        gdp_alluvial_figure,
-        covid_evolution_figure,
-        gdp_trend_figure,
-        gdp_mortality_scatter_figure,
-        age_mortality_figure,
+        generate_date_slider_marks,
+        generate_map_figure,
+        generate_gdp_alluvial_figure,
+        generate_covid_evolution_figure,
+        generate_gdp_trend_figure,
+        generate_gdp_mortality_scatter_figure,
+        generate_age_mortality_figure,
     )
 except ImportError:
     from data_manipulation import (
@@ -22,13 +22,13 @@ except ImportError:
         FILEPATH,
         build_map_base_data,
         prepare_map_data,
-        date_slider_marks,
-        map_figure,
-        gdp_alluvial_figure,
-        covid_evolution_figure,
-        gdp_trend_figure,
-        gdp_mortality_scatter_figure,
-        age_mortality_figure,
+        generate_date_slider_marks,
+        generate_map_figure,
+        generate_gdp_alluvial_figure,
+        generate_covid_evolution_figure,
+        generate_gdp_trend_figure,
+        generate_gdp_mortality_scatter_figure,
+        generate_age_mortality_figure,
     )
 
 app = dash.Dash(__name__)
@@ -41,7 +41,7 @@ if df_health is None:
 assert df_health is not None
 df_health_data: pd.DataFrame = df_health
 
-date_marks = date_slider_marks(df_health, num_marks=3)
+date_marks = generate_date_slider_marks(df_health, num_marks=3)
 df_map_base = build_map_base_data(df_health)
 min_date = df_health['date'].min()
 max_date = df_health['date'].max()
@@ -196,12 +196,12 @@ def update_dashboard_views(selected_countries, end_date_value, metric_value):
     )
 
     return (
-        map_figure(df_map, end_date, metric=metric_value, color_max=color_max, selected_country_names=selected_countries),
-        gdp_alluvial_figure(allowed_country_names=selected_countries),
-        covid_evolution_figure(df_health_data, selected_countries),
-        gdp_trend_figure(selected_countries),
-        gdp_mortality_scatter_figure(df_health_data, selected_countries),
-        age_mortality_figure(df_health_data, selected_countries),
+        generate_map_figure(df_map, end_date, metric=metric_value, color_max=color_max, selected_country_names=selected_countries),
+        generate_gdp_alluvial_figure(allowed_country_names=selected_countries),
+        generate_covid_evolution_figure(df_health_data, selected_countries),
+        generate_gdp_trend_figure(selected_countries),
+        generate_gdp_mortality_scatter_figure(df_health_data, selected_countries),
+        generate_age_mortality_figure(df_health_data, selected_countries),
         summary_text,
         f'{selected_count} países',
         f'{total_deaths_text} mortes/milhão',
@@ -290,6 +290,8 @@ app.layout = html.Div(
                 ),
             ],
         ),
+
+        # Main content area with map and charts
         html.Div(
             children=[
                 html.Div(
@@ -303,7 +305,7 @@ app.layout = html.Div(
                         ),
                         dcc.Graph(
                             id='map-graph',
-                            figure=map_figure(
+                            figure=generate_map_figure(
                                 prepare_map_data(df_map_base, default_date, preprocessed=True),
                                 default_date,
                                 metric='total_deaths',
@@ -360,7 +362,7 @@ app.layout = html.Div(
                         html.Div('Evolução do PIB por país', className='panel-title'),
                         dcc.Graph(
                             id='gdp-alluvial-graph',
-                            figure=gdp_alluvial_figure(allowed_country_names=default_countries),
+                            figure=generate_gdp_alluvial_figure(allowed_country_names=default_countries),
                             className='report-graph',
                             config={'displayModeBar': False, 'responsive': True},
                         ),
@@ -372,7 +374,7 @@ app.layout = html.Div(
                         html.Div('Evolução pandémica', className='panel-title'),
                         dcc.Graph(
                             id='covid-evolution-graph',
-                            figure=covid_evolution_figure(df_health_data, default_countries),
+                            figure=generate_covid_evolution_figure(df_health_data, default_countries),
                             className='report-graph',
                             config={'displayModeBar': False, 'responsive': True},
                         ),
@@ -384,7 +386,7 @@ app.layout = html.Div(
                         html.Div('PIB e resiliência económica', className='panel-title'),
                         dcc.Graph(
                             id='gdp-trend-graph',
-                            figure=gdp_trend_figure(default_countries),
+                            figure=generate_gdp_trend_figure(default_countries),
                             className='report-graph',
                             config={'displayModeBar': False, 'responsive': True},
                         ),
@@ -396,7 +398,7 @@ app.layout = html.Div(
                         html.Div('PIB vs mortalidade', className='panel-title'),
                         dcc.Graph(
                             id='gdp-mortality-scatter-graph',
-                            figure=gdp_mortality_scatter_figure(df_health_data, default_countries),
+                            figure=generate_gdp_mortality_scatter_figure(df_health_data, default_countries),
                             className='report-graph',
                             config={'displayModeBar': False, 'responsive': True},
                         ),
@@ -408,7 +410,7 @@ app.layout = html.Div(
                         html.Div('Envelhecimento e mortalidade', className='panel-title'),
                         dcc.Graph(
                             id='age-mortality-graph',
-                            figure=age_mortality_figure(df_health_data, default_countries),
+                            figure=generate_age_mortality_figure(df_health_data, default_countries),
                             className='report-graph',
                             config={'displayModeBar': False, 'responsive': True},
                         ),

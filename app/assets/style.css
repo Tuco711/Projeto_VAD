@@ -367,14 +367,14 @@ body {
   position: absolute;
   left: 62px;
   top: 0;
-  width: 320px;
+  width: 450px;
   max-height: calc(100vh - 160px);
   overflow: auto;
   background: linear-gradient(135deg, #fbfdff 0%, #eef4ff 100%);
   border: 1px solid #dbe7ff;
   box-shadow: 0 16px 40px rgba(15,23,42,0.08);
   border-radius: 14px;
-  padding: 12px;
+  padding: 20px;
   opacity: 0;
   pointer-events: none;
   transform: translateY(4px);
