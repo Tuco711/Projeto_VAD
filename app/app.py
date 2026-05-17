@@ -54,14 +54,7 @@ country_options = [{'label': 'World', 'value': 'World'}] + [
     {'label': location, 'value': location}
     for location in country_values
 ]
-default_countries = (
-    prepare_map_data(df_map_base, preprocessed=True)
-    .sort_values('total_deaths', ascending=False)['location']
-    .dropna()
-    .drop_duplicates()
-    .head(6)
-    .tolist()
-)
+default_countries = ['World']
 
 MIN_DATE_MS = int(min_date.value // 10**6)
 MAX_DATE_MS = int(max_date.value // 10**6)
@@ -203,7 +196,34 @@ def update_dashboard_views(selected_countries, end_date_value, metric_value):
     latest_data = prepare_map_data(df_health_data, preprocessed=True)
     selected_latest = latest_data[latest_data['location'].isin(selected_countries)].copy()
     selected_count = len(selected_countries)
-    total_deaths_million = selected_latest['total_deaths_per_million'].mean()
+
+    # Compute deaths per million. If World selected, prefer explicit World row,
+    # otherwise compute population-weighted aggregate from non-aggregate countries.
+    total_deaths_million = np.nan
+    if selected_countries == ['World']:
+        # Prefer World row if present
+        world_row = latest_data[latest_data['location'] == 'World'] if 'location' in latest_data.columns else latest_data.iloc[0:0]
+        if not world_row.empty and 'total_deaths_per_million' in world_row.columns and pd.notna(world_row.iloc[0].get('total_deaths_per_million')):
+            total_deaths_million = float(world_row.iloc[0]['total_deaths_per_million'])
+        else:
+            non_agg = latest_data[~latest_data['location'].isin(['World', 'International', 'European Union'])].copy()
+            # If raw total_deaths available, compute (sum deaths / sum pop) * 1e6
+            if 'total_deaths' in non_agg.columns and 'population' in non_agg.columns and not non_agg.empty:
+                total_deaths_sum = non_agg['total_deaths'].sum(min_count=1)
+                pop_sum = non_agg['population'].sum(min_count=1)
+                if pop_sum and not pd.isna(total_deaths_sum):
+                    total_deaths_million = float((total_deaths_sum / pop_sum) * 1_000_000)
+            # Fallback: if only per-million available, compute population-weighted average
+            elif 'total_deaths_per_million' in non_agg.columns and 'population' in non_agg.columns and not non_agg.empty:
+                weighted = (non_agg['total_deaths_per_million'] * non_agg['population']).sum(min_count=1)
+                pop_sum = non_agg['population'].sum(min_count=1)
+                if pop_sum and not pd.isna(weighted):
+                    total_deaths_million = float(weighted / pop_sum)
+    else:
+        # For non-world selections, use simple mean of per-country per-million values
+        if 'total_deaths_per_million' in selected_latest.columns and not selected_latest.empty:
+            total_deaths_million = selected_latest['total_deaths_per_million'].mean()
+
     vaccination_rate = _mean_latest_valid_metric(
         df_health_data,
         selected_countries,
