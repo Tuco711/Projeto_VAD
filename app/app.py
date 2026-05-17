@@ -49,7 +49,8 @@ default_date = max_date
 max_total_deaths = df_health['total_deaths'].max()
 max_cfr_pct = df_map_base['cfr_pct'].max()
 country_values = sorted(df_map_base['location'].dropna().unique().tolist())
-country_options = [
+selection_values = set(country_values) | {'World'}
+country_options = [{'label': 'World', 'value': 'World'}] + [
     {'label': location, 'value': location}
     for location in country_values
 ]
@@ -83,7 +84,9 @@ def _normalize_selected_countries(selected_countries):
         return default_countries
 
     # Normalize items to str and filter by available values
-    normalized = [str(country) for country in selected_countries if pd.notna(country) and str(country) in country_values]
+    normalized = [str(country) for country in selected_countries if pd.notna(country) and str(country) in selection_values]
+    if 'World' in normalized:
+        return ['World']
     return normalized or default_countries
 
 
@@ -134,7 +137,7 @@ def sync_country_selection(dropdown_value, map_click, alluvial_click, covid_clic
     clicked_country = _extract_country_from_click(
         map_click or alluvial_click or covid_click or gdp_click or scatter_click or age_click
     )
-    if clicked_country in country_values:
+    if clicked_country in selection_values:
         return [clicked_country]
 
     return current_selection
@@ -167,6 +170,9 @@ def update_dashboard_views(selected_countries, end_date_value, metric_value):
     metric_value = metric_value or 'total_deaths'
     color_max = max_total_deaths if metric_value == 'total_deaths' else max_cfr_pct
 
+    map_selected_countries = [] if selected_countries == ['World'] else selected_countries
+    world_only_selection = ['World'] if selected_countries == ['World'] else selected_countries
+
     latest_data = prepare_map_data(df_health_data, preprocessed=True)
     selected_latest = latest_data[latest_data['location'].isin(selected_countries)].copy()
     selected_count = len(selected_countries)
@@ -190,20 +196,22 @@ def update_dashboard_views(selected_countries, end_date_value, metric_value):
     summary_text = html.Div(
         children=[
             html.Span('Seleção ativa: ', className='selection-summary-label'),
-            html.Span(', '.join(selected_countries[:4]), className='selection-summary-countries'),
-            html.Span('' if len(selected_countries) <= 4 else f' +{len(selected_countries) - 4}', className='selection-summary-more'),
+            html.Span('Mundo' if selected_countries == ['World'] else ', '.join(selected_countries[:4]), className='selection-summary-countries'),
+            html.Span('' if len(selected_countries) <= 4 or selected_countries == ['World'] else f' +{len(selected_countries) - 4}', className='selection-summary-more'),
         ]
     )
 
+    selected_count_text = 'Mundo' if selected_countries == ['World'] else f'{selected_count} países'
+
     return (
-        generate_map_figure(df_map, end_date, metric=metric_value, color_max=color_max, selected_country_names=selected_countries),
-        generate_gdp_alluvial_figure(allowed_country_names=selected_countries),
-        generate_covid_evolution_figure(df_health_data, selected_countries),
-        generate_gdp_trend_figure(selected_countries),
-        generate_gdp_mortality_scatter_figure(df_health_data, selected_countries),
-        generate_age_mortality_figure(df_health_data, selected_countries),
+        generate_map_figure(df_map, end_date, metric=metric_value, color_max=color_max, selected_country_names=map_selected_countries),
+        generate_gdp_alluvial_figure(allowed_country_names=world_only_selection),
+        generate_covid_evolution_figure(df_health_data, world_only_selection),
+        generate_gdp_trend_figure(world_only_selection),
+        generate_gdp_mortality_scatter_figure(df_health_data, world_only_selection),
+        generate_age_mortality_figure(df_health_data, world_only_selection),
         summary_text,
-        f'{selected_count} países',
+        selected_count_text,
         f'{total_deaths_text} mortes/milhão',
         f'{vaccination_text} totalmente vacinados',
     )

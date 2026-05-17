@@ -234,7 +234,9 @@ def generate_gdp_alluvial_figure(filepath: Path = GDP_FILEPATH, top_n: int = 12,
 def _resolve_country_selection(df_health: pd.DataFrame, selected_country_names=None, top_n: int = 6) -> list[str]:
     available_countries = [country for country in df_health['location'].dropna().drop_duplicates().tolist()]
     if selected_country_names:
-        selected = [country for country in selected_country_names if country in available_countries]
+        selected = [country for country in selected_country_names if country == 'World' or country in available_countries]
+        if 'World' in selected:
+            return ['World']
         if selected:
             return selected
 
@@ -502,18 +504,28 @@ def generate_gdp_mortality_scatter_figure(df_health: pd.DataFrame, selected_coun
     gdp_2024 = pd.to_numeric(df_gdp[year_columns[2024]], errors='coerce')
     df_gdp['gdp_growth_pct'] = np.where(gdp_2019 > 0, ((gdp_2024 - gdp_2019) / gdp_2019) * 100, np.nan)
 
-    df_merged = df_latest.merge(df_gdp, left_on='iso_code', right_on='Country Code', how='inner')
-    df_merged = df_merged[df_merged['location'].isin(selected_country_names)].copy()
+    if selected_country_names == ['World']:
+        df_merged = (
+            df_latest[df_latest['location'] == 'World']
+            .merge(df_gdp[df_gdp['Country Name'] == 'World'], left_on='location', right_on='Country Name', how='inner')
+            .copy()
+        )
+        if not df_merged.empty:
+            df_merged['continent'] = 'World'
+    else:
+        df_merged = df_latest.merge(df_gdp, left_on='iso_code', right_on='Country Code', how='inner')
+        df_merged = df_merged[df_merged['location'].isin(selected_country_names)].copy()
+
     df_merged = df_merged.dropna(subset=['gdp_growth_pct', 'total_deaths_per_million'])
 
     # Criar colormap por continente
-    continents = df_merged['continent'].unique() if 'continent' in df_merged.columns else []
     continent_colors = {
         'Africa': '#ef4444',
         'Americas': '#3b82f6',
         'Asia': '#10b981',
         'Europe': '#f59e0b',
         'Oceania': '#8b5cf6'
+        , 'World': COLOR_PALETTE['primary']
     }
     df_merged['color'] = df_merged['continent'].map(continent_colors) if 'continent' in df_merged.columns else COLOR_PALETTE['primary']
 
@@ -829,6 +841,9 @@ def generate_map_figure(df_map: pd.DataFrame, end_date=None, metric='total_death
             (df_plot['total_deaths'] / df_plot['total_cases']) * 100,
             np.nan,
         )
+
+    if selected_country_names and 'World' in selected_country_names:
+        selected_country_names = []
 
     selected_country_names = [country for country in (selected_country_names or []) if country in set(df_plot['location'].dropna())]
 

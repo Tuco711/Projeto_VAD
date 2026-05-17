@@ -328,8 +328,8 @@ body {
 /* Left collapsible sidebar */
 #left-sidebar {
   position: fixed;
-  left: 18px;
-  top: 120px;
+  right: 18px;
+  top: 104px;
   height: auto;
   width: 56px;
   z-index: 1200;
@@ -365,7 +365,7 @@ body {
 /* Floating panel that appears on hover of the container */
 .left-panel {
   position: absolute;
-  left: 62px;
+  right: 62px;
   top: 0;
   width: 450px;
   max-height: calc(100vh - 160px);
