@@ -273,9 +273,16 @@ app.layout = html.Div(
                     children=[
                         html.Div('The Pandemic Lens', className='dashboard-title'),
                         html.Div(
-                            'Health, economy and demographic trends during the CoVID-19 pandemic',
+                            'Health, economy and demographic trends during the CoVID-19 pandemic\n' \
+                            'Explore the interplay of health and economic indicators across countries, and how they evolved over time.',
                             className='dashboard-subtitle',
                         ),
+                        html.Div(
+                            children=[
+                                html.A('Data Source', href='https://ourworldindata.org/coronavirus-data', target='_blank', className='dashboard-link'),
+                                html.Span(' | ', className='dashboard-link-separator'),
+                            ]
+                        )
                     ],
                     className='dashboard-hero-copy',
                 ),
